@@ -30,6 +30,7 @@ const AiModal = ({
   const [originalContent, setOriginalContent] = useState("");
 
   useEffect(() => {
+    console.log("hello world");
     if (messages.length > 0) {
       setOriginalContent(messages[messages.length - 1].content);
       setDraftContent(messages[messages.length - 1].content);

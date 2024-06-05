@@ -18,7 +18,7 @@ import { database } from "../database/setup";
 const EditProfileModal = ({
   isOpen,
   onClose,
-  uniqueId,
+  didKey,
   initialName,
   initialEmail,
 }) => {
@@ -27,7 +27,7 @@ const EditProfileModal = ({
 
   const handleSaveProfile = async () => {
     try {
-      await updateDoc(doc(database, "users", uniqueId), {
+      await updateDoc(doc(database, "users", didKey), {
         name: name,
         email: email,
       });

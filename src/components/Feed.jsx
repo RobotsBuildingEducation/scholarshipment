@@ -10,23 +10,29 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { database } from "../database/setup";
-import { Container, Heading, Button, useDisclosure } from "@chakra-ui/react";
-import FiltersModal from "./FiltersModal";
-import EditProfileModal from "./EditProfileModal";
-import AiModal from "./AiModal";
+import {
+  Container,
+  Heading,
+  Button,
+  useDisclosure,
+  Spinner,
+} from "@chakra-ui/react";
+import UserProfileModal from "./UserProfileModal";
 import { useChatCompletion } from "../hooks/useChatCompletion";
 import ScholarshipList from "./ScholarshipList";
+import AiModal from "./AiModal";
 
-const Feed = () => {
+const Feed = ({ didKey }) => {
   const {
     isOpen: isFiltersOpen,
     onOpen: onFiltersOpen,
     onClose: onFiltersClose,
   } = useDisclosure();
+
   const {
-    isOpen: isEditProfileOpen,
-    onOpen: onEditProfileOpen,
-    onClose: onEditProfileClose,
+    isOpen: isUserProfileOpen,
+    onOpen: onUserProfileOpen,
+    onClose: onUserProfileClose,
   } = useDisclosure();
   const {
     isOpen: isAiModalOpen,
@@ -34,7 +40,8 @@ const Feed = () => {
     onClose: onAiModalClose,
   } = useDisclosure();
 
-  const [uniqueId, setUniqueId] = useState("");
+  const [suggestedScholarships, setSuggestedScholarships] = useState([]);
+  const [isFetchingUserData, setIsFetchingUserData] = useState(false);
   const [scholarships, setScholarships] = useState([]);
   const [filteredScholarships, setFilteredScholarships] = useState([]);
   const [drafts, setDrafts] = useState([]);
@@ -50,9 +57,16 @@ const Feed = () => {
   const [originalDraft, setOriginalDraft] = useState(null);
   const { messages, submitPrompt, resetMessages, abortResponse } =
     useChatCompletion();
+  const {
+    messages: transformedMessages,
+    submitPrompt: transformedSubmitPrompt,
+    resetMessages: transformedResetMessages,
+    abortResponse: transformAbortResponse,
+  } = useChatCompletion({ response_format: { type: "json_object" } });
   const [promptData, setPromptData] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [viewMode, setViewMode] = useState("all"); // New state to manage view mode
+  const [viewMode, setViewMode] = useState("all");
+  const [recommendedScholarships, setRecommendedScholarships] = useState([]);
 
   const onSend = async (scholarship) => {
     try {
@@ -60,10 +74,9 @@ const Feed = () => {
       setSelectedScholarship(scholarship);
       handleOpenSaveModal(scholarship);
 
-      // Check if a draft already exists
       const draftDocRef = doc(
         database,
-        `users/${uniqueId}/drafts`,
+        `users/${didKey}/drafts`,
         scholarship.id
       );
       const draftDoc = await getDoc(draftDocRef);
@@ -92,34 +105,33 @@ const Feed = () => {
   };
 
   const fetchUserData = async () => {
-    const id = localStorage.getItem("uniqueId");
-    setUniqueId(id);
-
-    if (id) {
-      try {
-        const userDocRef = doc(database, "users", id);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setName(userData.name || "");
-          setEmail(userData.email || "");
-          if (userData.filters) {
-            setTempFilters(userData.filters);
-            setFilters(userData.filters);
-          }
+    const id = didKey;
+    try {
+      setIsFetchingUserData(true);
+      const userDocRef = await doc(database, "users", id);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setName(userData.name || "");
+        setEmail(userData.email || "");
+        if (userData.filters) {
+          setTempFilters(userData.filters);
+          setFilters(userData.filters);
         }
-      } catch (error) {
-        console.log("Error fetching user data:", error);
       }
+      setIsFetchingUserData(false);
+    } catch (error) {
+      setIsFetchingUserData(false);
+      console.log("Error fetching user data:", error);
     }
   };
 
   const fetchDrafts = async () => {
     setIsRenderingSpotlight(false);
-    if (uniqueId) {
+    if (didKey) {
       try {
         const draftsQuery = query(
-          collection(database, `users/${uniqueId}/drafts`)
+          collection(database, `users/${didKey}/drafts`)
         );
         const querySnapshot = await getDocs(draftsQuery);
         const loadedDrafts = querySnapshot.docs.map((doc) => ({
@@ -135,10 +147,10 @@ const Feed = () => {
 
   const fetchSavedScholarships = async () => {
     setIsRenderingSpotlight(false);
-    if (uniqueId) {
+    if (didKey) {
       try {
         const savedQuery = query(
-          collection(database, `users/${uniqueId}/savedScholarships`)
+          collection(database, `users/${didKey}/savedScholarships`)
         );
         const querySnapshot = await getDocs(savedQuery);
         const loadedSavedScholarships = querySnapshot.docs.map((doc) => ({
@@ -155,10 +167,40 @@ const Feed = () => {
   useEffect(() => {
     setIsRenderingSpotlight(true);
     fetchUserData();
-    loadScholarships(true); // Load spotlight scholarships initially
-    // fetchDrafts();
-    // fetchSavedScholarships();
-  }, []);
+    loadScholarships(true);
+  }, [didKey]);
+
+  useEffect(() => {
+    console.log("messages from effect", transformedMessages);
+    if (transformedMessages.length > 0) {
+      if (transformedMessages[transformedMessages.length - 1].meta.done) {
+        console.log(
+          "final message",
+          JSON.stringify(
+            transformedMessages[transformedMessages.length - 1].content,
+            null,
+            2
+          )
+        );
+        // setSuggestedScholarships(
+        //
+        // );
+
+        const recommendedIds = JSON.parse(
+          transformedMessages[transformedMessages.length - 1].content
+        ).response.suggested;
+        console.log("RECC", recommendedIds);
+        const recommendedList = scholarships.filter((sch) =>
+          recommendedIds.includes(sch.id)
+        );
+
+        console.log("recommendedList", recommendedList);
+        setRecommendedScholarships(recommendedList);
+
+        setIsFetchingUserData(false);
+      }
+    }
+  }, [transformedMessages]);
 
   const loadScholarships = async (spotlightOnly = false) => {
     try {
@@ -217,9 +259,11 @@ const Feed = () => {
 
   const handleSaveSettings = async () => {
     try {
-      if (uniqueId) {
-        await updateDoc(doc(database, "users", uniqueId), {
+      if (didKey) {
+        await updateDoc(doc(database, "users", didKey), {
           filters: tempFilters,
+          name: name,
+          email: email,
         });
         setFilters(tempFilters);
 
@@ -241,11 +285,11 @@ const Feed = () => {
   };
 
   const handleSaveScholarship = async (scholarship) => {
-    if (uniqueId) {
+    if (didKey) {
       try {
         const scholarshipDocRef = doc(
           database,
-          `users/${uniqueId}/savedScholarships`,
+          `users/${didKey}/savedScholarships`,
           scholarship.id
         );
         await setDoc(scholarshipDocRef, scholarship);
@@ -264,11 +308,11 @@ const Feed = () => {
   };
 
   const handleSaveDraft = async (draftContent) => {
-    if (selectedScholarship && uniqueId) {
+    if (selectedScholarship && didKey) {
       try {
         const draftDocRef = doc(
           database,
-          `users/${uniqueId}/drafts`,
+          `users/${didKey}/drafts`,
           selectedScholarship.id
         );
         await setDoc(draftDocRef, {
@@ -294,11 +338,11 @@ const Feed = () => {
   };
 
   const handleFormSubmit = async () => {
-    if (selectedScholarship && uniqueId) {
+    if (selectedScholarship && didKey) {
       try {
         const scholarshipDocRef = doc(
           database,
-          `users/${uniqueId}/savedScholarships`,
+          `users/${didKey}/savedScholarships`,
           selectedScholarship.id
         );
         await setDoc(scholarshipDocRef, {
@@ -322,7 +366,6 @@ const Feed = () => {
 
   const handleViewSavedClick = () => {
     fetchSavedScholarships();
-
     setViewMode("saved");
   };
 
@@ -331,29 +374,106 @@ const Feed = () => {
     setViewMode("all");
   };
 
-  console.log("isrendering", isRenderingSpotlight);
+  const handleRecommendedClick = async () => {
+    setIsFetchingUserData(true);
+    const userDocRef = await doc(database, "users", didKey);
+    const userDoc = await getDoc(userDocRef);
+
+    const userData = userDoc.data();
+    const userProfile = {
+      name: userData.name,
+      email: userData.email,
+      filters: userData.filters,
+    };
+
+    const prompt = `
+          Based on the following user profile: ${JSON.stringify(userProfile)},
+          select the top 5 scholarships from the list: ${JSON.stringify(
+            scholarships
+          )} 
+          that best match the user's profile. Return the list of scholarship IDs.
+
+          Return the JSON in the following format:
+          response { 
+            suggested: [list of scholarship IDs]
+          }
+        `;
+
+    await transformedSubmitPrompt([{ content: prompt, role: "user" }]).then(
+      () => {
+        setViewMode("recommended");
+      }
+    );
+  };
+
+  let feedRender = null;
+  if (isFetchingUserData) {
+    feedRender = (
+      <>
+        <Spinner />
+      </>
+    );
+  } else {
+    feedRender = (
+      <>
+        {isRenderingSpotlight ? (
+          <Heading as="h3" size="lg">
+            Spotlight
+          </Heading>
+        ) : null}
+
+        {viewMode === "all" && (
+          <ScholarshipList
+            scholarships={filteredScholarships}
+            onSaveScholarship={handleSaveScholarship}
+            onSend={onSend}
+          />
+        )}
+        {viewMode === "drafts" && (
+          <ScholarshipList
+            scholarships={drafts}
+            onSaveScholarship={handleSaveScholarship}
+            onSend={onSend}
+          />
+        )}
+        {viewMode === "saved" && (
+          <ScholarshipList
+            scholarships={savedScholarships}
+            onSaveScholarship={handleSaveScholarship}
+            onSend={onSend}
+          />
+        )}
+        {viewMode === "recommended" && (
+          <ScholarshipList
+            scholarships={recommendedScholarships}
+            onSaveScholarship={handleSaveScholarship}
+            onSend={onSend}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <Container>
       <Heading as="h1" mb={4}>
         Scholarships
       </Heading>
-      <Button onClick={onFiltersOpen}>Set Preferences</Button>
-      <Button onClick={onEditProfileOpen} ml={4}>
-        Edit Profile
-      </Button>
-
+      <Button onClick={onUserProfileOpen}>User Profile</Button>
       <br />
       <br />
       <>
         <Button onClick={handleViewAllClick} ml={4}>
           View All
         </Button>
-
         <Button onClick={handleViewDraftsClick} ml={4}>
           View Drafts
         </Button>
         <Button onClick={handleViewSavedClick} ml={4}>
           View Saved
+        </Button>
+        <Button onClick={handleRecommendedClick} ml={4}>
+          View Recommended
         </Button>
         {filters && (
           <Button onClick={handleMyScholarshipsClick} ml={4}>
@@ -363,50 +483,19 @@ const Feed = () => {
       </>
       <br />
       <br />
-      {isRenderingSpotlight ? (
-        <Heading as="h3" size="lg">
-          Spotlight
-        </Heading>
-      ) : null}
 
-      {viewMode === "all" && (
-        <ScholarshipList
-          scholarships={filteredScholarships}
-          onSaveScholarship={handleSaveScholarship}
-          onSend={onSend}
-        />
-      )}
-      {viewMode === "drafts" && (
-        <ScholarshipList
-          scholarships={drafts}
-          onSaveScholarship={handleSaveScholarship}
-          onSend={onSend}
-        />
-      )}
-      {viewMode === "saved" && (
-        <ScholarshipList
-          scholarships={savedScholarships}
-          onSaveScholarship={handleSaveScholarship}
-          onSend={onSend}
-        />
-      )}
+      {feedRender}
 
-      <FiltersModal
-        isOpen={isFiltersOpen}
-        onClose={onFiltersClose}
+      <UserProfileModal
+        isOpen={isUserProfileOpen}
+        onClose={onUserProfileClose}
+        didKey={didKey}
+        initialName={name}
+        initialEmail={email}
         tempFilters={tempFilters}
         setTempFilters={setTempFilters}
         handleSaveSettings={handleSaveSettings}
         handleSubmitFilters={filterScholarships}
-        handleMyScholarshipsClick={handleMyScholarshipsClick}
-      />
-
-      <EditProfileModal
-        isOpen={isEditProfileOpen}
-        onClose={onEditProfileClose}
-        uniqueId={uniqueId}
-        initialName={name}
-        initialEmail={email}
       />
 
       <AiModal

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { setDoc, doc, updateDoc } from "firebase/firestore";
 import { database } from "../database/setup";
 import {
@@ -22,7 +22,6 @@ const Onboarding = ({ handleOnboardingComplete, uniqueId }) => {
       name: name,
       email: email,
     });
-
     handleOnboardingComplete();
   };
 
@@ -64,7 +63,6 @@ const Onboarding = ({ handleOnboardingComplete, uniqueId }) => {
           onChange={(e) => setEmail(e.target.value)}
         />
         <Button onClick={handleOnboarding}>Complete Onboarding</Button>
-
         <Text>
           Please save your DID key: <br />
           <strong>{uniqueId}</strong>

@@ -206,6 +206,7 @@ export const useChatCompletion = (apiParams) => {
           ...msg.meta,
           loading: false,
           responseTime: formattedDiff,
+          done: true,
         },
       }))
     );
