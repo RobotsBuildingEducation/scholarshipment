@@ -22,10 +22,11 @@ import {
   MenuItemOption,
   MenuOptionGroup,
 } from "@chakra-ui/react";
-
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
 import { database } from "../database/setup";
 import { ChevronDownIcon } from "@chakra-ui/icons";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { storage } from "../database/setup";
 
 const AdminPage = () => {
   const [password, setPassword] = useState("");
@@ -43,7 +44,7 @@ const AdminPage = () => {
     link: "",
     tags: [],
     details: "",
-    meta: "", // New field for meta
+    meta: "",
     isHighschool: false,
     isCollege: false,
     isUnderserved: false,
@@ -51,8 +52,12 @@ const AdminPage = () => {
     isStateOnly: false,
     isSpotlight: false,
   });
+  const [files, setFiles] = useState([]);
+  const [downloadURLs, setDownloadURLs] = useState([]);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState("");
 
-  const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD; // Replace this with your actual password
+  const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD;
 
   useEffect(() => {
     const storedPassword = localStorage.getItem("adminPassword");
@@ -120,10 +125,79 @@ const AdminPage = () => {
     }));
   };
 
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      setFiles([...e.target.files]);
+    }
+  };
+
+  const handleUpload = async (scholarshipId) => {
+    if (files.length === 0) return;
+
+    const uploadPromises = files.map((file) => {
+      return new Promise((resolve, reject) => {
+        const storageRef = ref(
+          storage,
+          `uploads/${scholarshipId}/${file.name}`
+        );
+        const uploadTask = uploadBytesResumable(storageRef, file);
+
+        uploadTask.on(
+          "state_changed",
+          (snapshot) => {
+            const progress = Math.round(
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+            );
+            setProgress(progress);
+          },
+          (error) => {
+            setError(error.message);
+            reject(error);
+          },
+          () => {
+            getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+              resolve(downloadURL);
+            });
+          }
+        );
+      });
+    });
+
+    try {
+      const urls = await Promise.all(uploadPromises);
+      setDownloadURLs(urls);
+      setFiles([]);
+      setProgress(0);
+      setError("");
+      return urls;
+    } catch (error) {
+      console.error("Error uploading files: ", error);
+      setError(error.message);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await addDoc(collection(database, "scholarships"), formData);
+      // Create the scholarship document first to get the ID
+      const scholarshipRef = await addDoc(
+        collection(database, "scholarships"),
+        {
+          ...formData,
+          fileURLs: [], // Temporarily empty, will be updated later
+        }
+      );
+      const scholarshipId = scholarshipRef.id;
+
+      // Upload the files to the subdirectory with the scholarship ID
+      const fileUploadResult = await handleUpload(scholarshipId);
+      console.log("upload complete", fileUploadResult);
+
+      // Update the scholarship document with the download URLs
+      await updateDoc(doc(database, "scholarships", scholarshipId), {
+        fileURLs: fileUploadResult,
+      });
+
       alert("Scholarship published successfully");
       setFormData({
         collectionType: [],
@@ -137,7 +211,7 @@ const AdminPage = () => {
         link: "",
         tags: [],
         details: "",
-        meta: "", // Reset meta field
+        meta: "",
         isHighschool: false,
         isCollege: false,
         isUnderserved: false,
@@ -145,6 +219,7 @@ const AdminPage = () => {
         isStateOnly: false,
         isSpotlight: false,
       });
+      setDownloadURLs([]);
     } catch (error) {
       console.error("Error adding document: ", error);
     }
@@ -170,8 +245,24 @@ const AdminPage = () => {
       <Container>
         <Box>
           <Heading as="h2" size="xl" mb={4}>
-            Create Scholarship
+            Create
           </Heading>
+
+          <div>
+            <h1>Upload Files</h1>
+            <div>
+              <Input
+                style={{ border: "1px solid darkgray", height: 200 }}
+                multiple
+                type="file"
+                onChange={handleFileChange}
+              />
+              <Button onClick={handleUpload}>Upload</Button>
+              <div>{progress > 0 && `Upload is ${progress}% done`}</div>
+              {error && <div>Error: {error}</div>}
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit}>
             <FormControl id="collectionType" mb={4}>
               <FormLabel>Collection Type (select multiple)</FormLabel>
@@ -263,14 +354,16 @@ const AdminPage = () => {
                 name="isSpotlight"
                 isChecked={formData.isSpotlight}
                 onChange={handleChange}
+                style={{ border: "3px solid blue", padding: 12 }}
               >
-                Spotlight
+                Spotlight?
               </Checkbox>
             </FormControl>
 
             <FormControl id="name" mb={4}>
               <FormLabel>Name</FormLabel>
               <Input
+                style={{ border: "1px solid darkgray" }}
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
@@ -279,6 +372,7 @@ const AdminPage = () => {
             <FormControl id="dueDate" mb={4}>
               <FormLabel>Due Date</FormLabel>
               <Input
+                style={{ border: "1px solid darkgray" }}
                 name="dueDate"
                 type="date"
                 value={formData.dueDate}
@@ -288,6 +382,7 @@ const AdminPage = () => {
             <FormControl id="year" mb={4}>
               <FormLabel>Year</FormLabel>
               <Input
+                style={{ border: "1px solid darkgray" }}
                 name="year"
                 type="number"
                 value={formData.year}
@@ -297,6 +392,7 @@ const AdminPage = () => {
             <FormControl id="eligibility" mb={4}>
               <FormLabel>Eligibility</FormLabel>
               <Input
+                style={{ border: "1px solid darkgray" }}
                 name="eligibility"
                 value={formData.eligibility}
                 onChange={handleChange}
@@ -305,6 +401,7 @@ const AdminPage = () => {
             <FormControl id="major" mb={4}>
               <FormLabel>Major</FormLabel>
               <Input
+                style={{ border: "1px solid darkgray" }}
                 name="major"
                 value={formData.major}
                 onChange={handleChange}
@@ -322,6 +419,7 @@ const AdminPage = () => {
             <FormControl id="ethnicity" mb={4}>
               <FormLabel>Ethnicity</FormLabel>
               <Input
+                style={{ border: "1px solid darkgray" }}
                 name="ethnicity"
                 value={formData.ethnicity}
                 onChange={handleChange}
@@ -330,6 +428,7 @@ const AdminPage = () => {
             <FormControl id="link" mb={4}>
               <FormLabel>Link</FormLabel>
               <Input
+                style={{ border: "1px solid darkgray" }}
                 name="link"
                 type="url"
                 value={formData.link}
@@ -339,6 +438,7 @@ const AdminPage = () => {
             <FormControl id="tags" mb={4}>
               <FormLabel>Tags (press enter to create)</FormLabel>
               <Input
+                style={{ border: "1px solid darkgray" }}
                 value={tagInput}
                 onChange={handleTagInputChange}
                 placeholder="Add a tag and press enter"
@@ -402,6 +502,7 @@ const AdminPage = () => {
         <FormControl id="password" mb={4}>
           <FormLabel>Password</FormLabel>
           <Input
+            style={{ border: "1px solid darkgray" }}
             type="password"
             value={password}
             onChange={handlePasswordChange}

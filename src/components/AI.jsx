@@ -48,10 +48,10 @@ const AI = ({ messages, handleSave, isSending, existingDraft, original }) => {
       <Flex
         align="center"
         position="sticky"
-        top="0"
+        top="-8px"
         bg="#F0F0F0"
         zIndex="1"
-        p={2}
+        p={3}
         borderBottom="1px solid #ddd"
       >
         <Button size="sm" onClick={() => handleCopy(content)}>

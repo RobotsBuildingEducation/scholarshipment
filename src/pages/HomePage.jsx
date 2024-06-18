@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Web5 } from "@web5/api/browser";
 import { doc, setDoc } from "firebase/firestore";
 import { database } from "../database/setup";
-import { Box, keyframes } from "@chakra-ui/react";
+import { Box, Input, keyframes } from "@chakra-ui/react";
 
 import Feed from "../components/Feed";
 import logo from "../assets/logo.png";
@@ -33,13 +33,31 @@ const fluidDrop = keyframes`
   50% { transform: translateY(-30px) scale(0.9); }
 `;
 
-const HomePage = () => {
+const HomePage = ({ isAdminMode = false }) => {
   const [isNewUser, setIsNewUser] = useState(false);
-
   const [didKey, setDidKey] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isPasscodeCorrect, setIsPasscodeCorrect] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [passcode, setPasscode] = useState("");
+
+  const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+
+  useEffect(() => {
+    if (passcode === correctPassword) {
+      localStorage.setItem("adminPassword", passcode);
+      setIsLoggedIn(true);
+    }
+  }, [passcode]);
 
   const checkUser = async () => {
+    if (isAdminMode) {
+      const storedPassword = localStorage.getItem("adminPassword");
+      if (storedPassword === correctPassword) {
+        setIsLoggedIn(true);
+      }
+    }
+
     const id = localStorage.getItem("uniqueId");
     if (!id) {
       try {
@@ -74,6 +92,10 @@ const HomePage = () => {
     checkUser();
   }, []);
 
+  const handlePasscodeChange = (e) => {
+    setPasscode(e.target.value);
+  };
+
   if (loading)
     return (
       <Box
@@ -84,6 +106,7 @@ const HomePage = () => {
         animation={`${fadeIn} 1s ease-in-out`}
       >
         <Box
+          width={200}
           as="img"
           src={logo}
           borderRadius="34%"
@@ -92,7 +115,27 @@ const HomePage = () => {
       </Box>
     );
 
-  return <Feed didKey={didKey} />;
+  if (isAdminMode && !isLoggedIn)
+    return (
+      <Box
+        height="100vh"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        animation={`${fadeIn} 1s ease-in-out`}
+      >
+        <Box>
+          <Input
+            placeholder="Enter passcode"
+            value={passcode}
+            onChange={handlePasscodeChange}
+            style={{ border: "1px solid darkgray" }}
+          />
+        </Box>
+      </Box>
+    );
+
+  return <Feed didKey={didKey} isAdminMode={isAdminMode} />;
 };
 
 export default HomePage;

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
+  Drawer,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
   Button,
   Textarea,
   Box,
@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import AI from "./AI";
 
-const AiModal = ({
+const AiDrawer = ({
   isOpen,
   onClose,
   messages,
@@ -45,31 +45,28 @@ const AiModal = ({
     }
 
     setExistingDraft(content);
-    // onClose();
   };
 
   return (
-    <Modal
-      size={"full"}
+    <Drawer
       isOpen={isOpen}
+      placement="right"
       onClose={() => {
         resetMessages();
         setExistingDraft("");
         onClose();
       }}
+      closeOnOverlayClick={false}
+      blockScrollOnMount={false}
+      preserveScrollBarGap={false}
     >
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>Draft</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          {/* {originalContent && (
-            <Box mb={4}>
-              <Text fontWeight="bold">Original Draft:</Text>
-              <Textarea mt={2} value={originalContent} isReadOnly size="sm" />
-            </Box>
-          )} */}
+      <DrawerOverlay bg="rgba(0,0,0,0.1)" />
 
+      <DrawerContent>
+        <DrawerCloseButton />
+        <DrawerHeader>Draft</DrawerHeader>
+
+        <DrawerBody>
           <AI
             existingDraft={existingDraft}
             messages={messages}
@@ -77,8 +74,9 @@ const AiModal = ({
             isSending={isSending}
             original={original}
           />
-        </ModalBody>
-        <ModalFooter>
+        </DrawerBody>
+
+        <DrawerFooter>
           <Button
             onClick={() => {
               resetMessages();
@@ -88,10 +86,10 @@ const AiModal = ({
           >
             Close
           </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 };
 
-export default AiModal;
+export default AiDrawer;

@@ -1,3 +1,5 @@
+// Feed.jsx
+
 import React, { useState, useEffect } from "react";
 import {
   collection,
@@ -8,36 +10,49 @@ import {
   doc,
   getDoc,
   setDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { database } from "../database/setup";
 import {
   Container,
   Heading,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+  Spinner,
   Button,
   useDisclosure,
-  Spinner,
+  useBreakpointValue,
+  Box,
 } from "@chakra-ui/react";
 import UserProfileModal from "./UserProfileModal";
 import { useChatCompletion } from "../hooks/useChatCompletion";
 import ScholarshipList from "./ScholarshipList";
-import AiModal from "./AiModal";
+import AiDrawer from "./AiDrawer";
+import ResponsiveTabs from "../elements/ResponsiveTabs";
 
-const Feed = ({ didKey }) => {
+// const tabOrientation = useBreakpointValue({
+//   base: "vertical",
+//   md: "horizontal",
+// });
+
+const Feed = ({ didKey, isAdminMode }) => {
   const {
     isOpen: isFiltersOpen,
     onOpen: onFiltersOpen,
     onClose: onFiltersClose,
   } = useDisclosure();
-
   const {
     isOpen: isUserProfileOpen,
     onOpen: onUserProfileOpen,
     onClose: onUserProfileClose,
   } = useDisclosure();
   const {
-    isOpen: isAiModalOpen,
-    onOpen: onAiModalOpen,
-    onClose: onAiModalClose,
+    isOpen: isAiDrawerOpen,
+    onOpen: onAiDrawerOpen,
+    onClose: onAiDrawerClose,
   } = useDisclosure();
 
   const [suggestedScholarships, setSuggestedScholarships] = useState([]);
@@ -65,8 +80,12 @@ const Feed = ({ didKey }) => {
   } = useChatCompletion({ response_format: { type: "json_object" } });
   const [promptData, setPromptData] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [viewMode, setViewMode] = useState("all");
+  const [viewMode, setViewMode] = useState("spotlight"); // Set initial view mode to spotlight
   const [recommendedScholarships, setRecommendedScholarships] = useState([]);
+
+  function capitalizeFirstLetter(str) {
+    return str[0].toUpperCase() + str.slice(1);
+  }
 
   const onSend = async (scholarship) => {
     try {
@@ -182,9 +201,6 @@ const Feed = ({ didKey }) => {
             2
           )
         );
-        // setSuggestedScholarships(
-        //
-        // );
 
         const recommendedIds = JSON.parse(
           transformedMessages[transformedMessages.length - 1].content
@@ -278,10 +294,12 @@ const Feed = ({ didKey }) => {
 
   const handleMyScholarshipsClick = () => {
     filterScholarships();
+    setViewMode("preferences");
   };
 
   const handleAllScholarshipsClick = () => {
     setFilteredScholarships(scholarships);
+    setViewMode("all");
   };
 
   const handleSaveScholarship = async (scholarship) => {
@@ -302,9 +320,44 @@ const Feed = ({ didKey }) => {
     }
   };
 
+  const handleDeleteScholarship = async (scholarship) => {
+    try {
+      await deleteDoc(doc(database, "scholarships", scholarship.id));
+      setScholarships(scholarships.filter((sch) => sch.id !== scholarship.id));
+      setFilteredScholarships(
+        filteredScholarships.filter((sch) => sch.id !== scholarship.id)
+      );
+      console.log("Scholarship deleted successfully!");
+    } catch (error) {
+      console.log("Error deleting scholarship:", error);
+    }
+  };
+
+  const handleUpdateScholarship = async (updatedScholarship) => {
+    try {
+      await updateDoc(
+        doc(database, "scholarships", updatedScholarship.id),
+        updatedScholarship
+      );
+      setScholarships(
+        scholarships.map((sch) =>
+          sch.id === updatedScholarship.id ? updatedScholarship : sch
+        )
+      );
+      setFilteredScholarships(
+        filteredScholarships.map((sch) =>
+          sch.id === updatedScholarship.id ? updatedScholarship : sch
+        )
+      );
+      console.log("Scholarship updated successfully!");
+    } catch (error) {
+      console.log("Error updating scholarship:", error);
+    }
+  };
+
   const handleOpenSaveModal = (scholarship) => {
     setSelectedScholarship(scholarship);
-    onAiModalOpen();
+    onAiDrawerOpen();
   };
 
   const handleSaveDraft = async (draftContent) => {
@@ -350,7 +403,7 @@ const Feed = ({ didKey }) => {
           formText,
         });
         console.log("Form submitted and scholarship saved:", formText);
-        onAiModalClose();
+        onAiDrawerClose();
       } catch (error) {
         console.log("Error submitting form:", error);
       }
@@ -417,75 +470,95 @@ const Feed = ({ didKey }) => {
     feedRender = (
       <>
         {isRenderingSpotlight ? (
-          <Heading as="h3" size="lg">
-            Spotlight
-          </Heading>
+          <>
+            <Heading as="h3" size="lg" style={{ marginTop: 4 }}>
+              Spotlight
+            </Heading>
+            <ScholarshipList
+              scholarships={scholarships.filter((sch) => sch.isSpotlight)}
+              onSaveScholarship={handleSaveScholarship}
+              onSend={onSend}
+              onDelete={handleDeleteScholarship}
+              onUpdate={handleUpdateScholarship}
+              isAdminMode={isAdminMode}
+            />
+          </>
         ) : null}
-
-        {viewMode === "all" && (
-          <ScholarshipList
-            scholarships={filteredScholarships}
-            onSaveScholarship={handleSaveScholarship}
-            onSend={onSend}
-          />
-        )}
-        {viewMode === "drafts" && (
-          <ScholarshipList
-            scholarships={drafts}
-            onSaveScholarship={handleSaveScholarship}
-            onSend={onSend}
-          />
-        )}
-        {viewMode === "saved" && (
-          <ScholarshipList
-            scholarships={savedScholarships}
-            onSaveScholarship={handleSaveScholarship}
-            onSend={onSend}
-          />
-        )}
-        {viewMode === "recommended" && (
-          <ScholarshipList
-            scholarships={recommendedScholarships}
-            onSaveScholarship={handleSaveScholarship}
-            onSend={onSend}
-          />
-        )}
+        <>
+          {viewMode === "spotlight" ? null : (
+            <Heading as="h3" size="lg">
+              {capitalizeFirstLetter(viewMode)}
+            </Heading>
+          )}
+          {viewMode === "all" && (
+            <ScholarshipList
+              scholarships={filteredScholarships}
+              onSaveScholarship={handleSaveScholarship}
+              onSend={onSend}
+              onDelete={handleDeleteScholarship}
+              onUpdate={handleUpdateScholarship}
+              isAdminMode={isAdminMode}
+            />
+          )}
+          {viewMode === "drafts" && (
+            <ScholarshipList
+              scholarships={drafts}
+              onSaveScholarship={handleSaveScholarship}
+              onSend={onSend}
+              onDelete={handleDeleteScholarship}
+              onUpdate={handleUpdateScholarship}
+              isAdminMode={isAdminMode}
+            />
+          )}
+          {viewMode === "saved" && (
+            <ScholarshipList
+              scholarships={savedScholarships}
+              onSaveScholarship={handleSaveScholarship}
+              onSend={onSend}
+              onDelete={handleDeleteScholarship}
+              onUpdate={handleUpdateScholarship}
+              isAdminMode={isAdminMode}
+            />
+          )}
+          {viewMode === "recommended" && (
+            <ScholarshipList
+              scholarships={recommendedScholarships}
+              onSaveScholarship={handleSaveScholarship}
+              onSend={onSend}
+              onDelete={handleDeleteScholarship}
+              onUpdate={handleUpdateScholarship}
+              isAdminMode={isAdminMode}
+            />
+          )}
+        </>
       </>
     );
   }
 
   return (
-    <Container>
-      <Heading as="h1" mb={4}>
-        Scholarships
-      </Heading>
+    <Container p={2}>
+      <br />
       <Button onClick={onUserProfileOpen}>User Profile</Button>
       <br />
       <br />
-      <>
-        <Button onClick={handleViewAllClick} ml={4}>
-          View All
-        </Button>
-        <Button onClick={handleViewDraftsClick} ml={4}>
-          View Drafts
-        </Button>
-        <Button onClick={handleViewSavedClick} ml={4}>
-          View Saved
-        </Button>
-        <Button onClick={handleRecommendedClick} ml={4}>
-          View Recommended
-        </Button>
-        {filters && (
-          <Button onClick={handleMyScholarshipsClick} ml={4}>
-            My Preferences
-          </Button>
-        )}
-      </>
-      <br />
-      <br />
 
-      {feedRender}
-
+      <br />
+      <Box overflowX="auto">
+        <ResponsiveTabs
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          handleViewAllClick={handleViewAllClick}
+          handleViewDraftsClick={handleViewDraftsClick}
+          handleViewSavedClick={handleViewSavedClick}
+          handleMyScholarshipsClick={handleMyScholarshipsClick}
+          handleRecommendedClick={handleRecommendedClick}
+        >
+          {feedRender}
+        </ResponsiveTabs>
+        {isRenderingSpotlight ? (
+          <div style={{ marginTop: 16, marginLeft: 16 }}>{feedRender}</div>
+        ) : null}
+      </Box>
       <UserProfileModal
         isOpen={isUserProfileOpen}
         onClose={onUserProfileClose}
@@ -497,12 +570,11 @@ const Feed = ({ didKey }) => {
         handleSaveSettings={handleSaveSettings}
         handleSubmitFilters={filterScholarships}
       />
-
-      <AiModal
+      <AiDrawer
         setExistingDraft={setExistingDraft}
         existingDraft={existingDraft}
-        isOpen={isAiModalOpen}
-        onClose={onAiModalClose}
+        isOpen={isAiDrawerOpen}
+        onClose={onAiDrawerClose}
         messages={messages}
         handleFormSubmit={handleFormSubmit}
         resetMessages={resetMessages}
