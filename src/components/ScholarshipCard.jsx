@@ -75,10 +75,6 @@ const ScholarshipCard = ({
                 height="500px"
                 objectFit="cover"
               />
-              <Carousel.Caption>
-                <h3>{`Slide ${index + 1}`}</h3>
-                <p>{`Description for slide ${index + 1}`}</p>
-              </Carousel.Caption>
             </Carousel.Item>
           ))}
         </Carousel>
@@ -121,8 +117,12 @@ const ScholarshipCard = ({
       </div>
 
       <Box p={6} style={{ marginTop: "-4px" }}>
-        <Text>Due Date: {scholarship.dueDate}</Text>
-        <Text>Eligibility: {scholarship.eligibility}</Text>
+        <Text>
+          <b>Due Date:</b> {scholarship?.dueDate || "-"}
+        </Text>
+        <Text>
+          <b>Eligibility:</b> {scholarship?.eligibility || "-"}
+        </Text>
 
         <Accordion allowMultiple>
           <AccordionItem>
@@ -132,7 +132,7 @@ const ScholarshipCard = ({
               }}
             >
               <Box flex="1" textAlign="left">
-                Show More Details
+                Learn more
               </Box>
               <AccordionIcon />
             </AccordionButton>
@@ -142,10 +142,18 @@ const ScholarshipCard = ({
                 backgroundColor: "#D8D8D8",
               }}
             >
-              <Text>Year: {scholarship.year}</Text>
-              <Text>Major: {scholarship.major}</Text>
-              <Text>Ethnicity: {scholarship.ethnicity}</Text>
-              <Text>Details: {scholarship.details}</Text>
+              <Text>
+                <b>Year:</b> {scholarship?.year || "-"}
+              </Text>
+              <Text>
+                <b>Major:</b> {scholarship?.major || "-"}
+              </Text>
+              <Text>
+                <b>Ethnicity:</b> {scholarship?.ethnicity || "-"}
+              </Text>
+              <Text>
+                <b>Details:</b> {scholarship?.details || "-"}
+              </Text>
             </AccordionPanel>
           </AccordionItem>
         </Accordion>

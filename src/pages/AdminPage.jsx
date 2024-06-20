@@ -391,7 +391,7 @@ const AdminPage = () => {
             </FormControl>
             <FormControl id="eligibility" mb={4}>
               <FormLabel>Eligibility</FormLabel>
-              <Input
+              <Textarea
                 style={{ border: "1px solid darkgray" }}
                 name="eligibility"
                 value={formData.eligibility}
@@ -470,6 +470,7 @@ const AdminPage = () => {
                 name="details"
                 value={formData.details}
                 onChange={handleChange}
+                style={{ border: "1px solid darkgray" }}
               />
             </FormControl>
             <FormControl id="meta" mb={4}>

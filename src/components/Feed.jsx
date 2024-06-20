@@ -100,6 +100,7 @@ const Feed = ({ didKey, isAdminMode }) => {
       );
       const draftDoc = await getDoc(draftDocRef);
 
+      console.log("Scholarship being processed...", scholarship);
       if (draftDoc?.exists()) {
         const draftData = draftDoc.data();
         setExistingDraft(draftData.draftContent);
@@ -109,7 +110,10 @@ const Feed = ({ didKey, isAdminMode }) => {
       } else {
         await submitPrompt([
           {
-            content: `Draft a sample scholarship essay in clean minimalist markdown without headers. Do not write anything other than the markdown content.`,
+            content: `Draft a sample scholarship essay in clean minimalist markdown without headers. 
+            The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
+              scholarship
+            )}`,
             role: "user",
           },
         ]);
@@ -555,9 +559,7 @@ const Feed = ({ didKey, isAdminMode }) => {
         >
           {feedRender}
         </ResponsiveTabs>
-        {isRenderingSpotlight ? (
-          <div style={{ marginTop: 16, marginLeft: 16 }}>{feedRender}</div>
-        ) : null}
+        {isRenderingSpotlight ? <div>{feedRender}</div> : null}
       </Box>
       <UserProfileModal
         isOpen={isUserProfileOpen}
