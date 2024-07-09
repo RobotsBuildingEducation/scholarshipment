@@ -59,7 +59,7 @@ const ResponsiveTabs = ({
           </AccordionButton>
           <AccordionPanel>{viewMode === "saved" && children}</AccordionPanel>
         </AccordionItem>
-        <AccordionItem>
+        {/* <AccordionItem>
           <AccordionButton onClick={handleMyScholarshipsClick}>
             <Box flex="1" textAlign="left">
               Preferences
@@ -69,7 +69,7 @@ const ResponsiveTabs = ({
           <AccordionPanel>
             {viewMode === "preferences" && children}
           </AccordionPanel>
-        </AccordionItem>
+        </AccordionItem> */}
         <AccordionItem>
           <AccordionButton onClick={handleRecommendedClick}>
             <Box flex="1" textAlign="left">
@@ -94,32 +94,36 @@ const ResponsiveTabs = ({
             "all",
             "drafts",
             "saved",
-            "preferences",
+            // "preferences",
             "recommended",
           ];
           setViewMode(modes[index]);
         }}
+        variant="soft-rounded"
+        colorScheme="blue"
+        style={{ marginBottom: 48 }}
       >
         <TabList>
           <Tab onMouseDown={handleViewAllClick}>All</Tab>
-          <Tab textAlign="left" onClick={handleViewDraftsClick}>
-            Drafts
-          </Tab>
           <Tab textAlign="left" onClick={handleViewSavedClick}>
             Saved
           </Tab>
-          <Tab textAlign="left" onClick={handleMyScholarshipsClick}>
-            Preferences
+          <Tab textAlign="left" onClick={handleViewDraftsClick}>
+            Drafts
           </Tab>
+
+          {/* <Tab textAlign="left" onClick={handleMyScholarshipsClick}>
+            Preferences
+          </Tab> */}
           <Tab textAlign="left" onClick={handleRecommendedClick}>
             Recommended
           </Tab>
         </TabList>
         <TabPanels>
           <TabPanel>{viewMode === "all" && children}</TabPanel>
-          <TabPanel>{viewMode === "drafts" && children}</TabPanel>
           <TabPanel>{viewMode === "saved" && children}</TabPanel>
-          <TabPanel>{viewMode === "preferences" && children}</TabPanel>
+          <TabPanel>{viewMode === "drafts" && children}</TabPanel>
+          {/* <TabPanel>{viewMode === "preferences" && children}</TabPanel> */}
           <TabPanel>{viewMode === "recommended" && children}</TabPanel>
         </TabPanels>
       </Tabs>

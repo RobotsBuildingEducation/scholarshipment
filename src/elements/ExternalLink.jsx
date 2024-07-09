@@ -1,5 +1,5 @@
+import { useToast } from "@chakra-ui/react";
 import React from "react";
-import { useNavigate } from "react-router-dom";
 
 export const ExternalSiteIcon = () => {
   return (
@@ -25,20 +25,20 @@ export const LinkIcon = () => {
       <path
         d="M14.1625 18.4876L13.4417 19.2084C11.053 21.5971 7.18019 21.5971 4.79151 19.2084C2.40283 16.8198 2.40283 12.9469 4.79151 10.5583L5.51236 9.8374"
         stroke="#404040"
-        stroke-width="1.5"
-        stroke-linecap="round"
+        strokeWidth="1.5"
+        strokeLinecap="round"
       />
       <path
         d="M9.8374 14.1625L14.1625 9.8374"
         stroke={"#404040"}
-        stroke-width="1.5"
-        stroke-linecap="round"
+        strokeWidth="1.5"
+        strokeLinecap="round"
       />
       <path
         d="M9.8374 5.51236L10.5583 4.79151C12.9469 2.40283 16.8198 2.40283 19.2084 4.79151C21.5971 7.18019 21.5971 11.053 19.2084 13.4417L18.4876 14.1625"
         stroke="#404040"
-        stroke-width="1.5"
-        stroke-linecap="round"
+        strokeWidth="1.5"
+        strokeLinecap="round"
       />
     </svg>
   );
@@ -51,12 +51,22 @@ export const ExternalLink = ({
   type,
   scholarshipID,
 }) => {
-  const navigate = useNavigate();
-
+  let toast = useToast();
   const handleClick = (e) => {
     if (type === "copyLink") {
       e.preventDefault();
-      navigate(`/${scholarshipID}`);
+      navigator.clipboard
+        .writeText("https://scholarshipment.web.app/" + scholarshipID)
+        .then(() => {
+          toast({
+            title: "Link copied",
+            description: "The link has been copied 📢 ❗❗❗❗❗",
+            status: "info",
+            duration: 2000,
+            isClosable: true,
+            position: "top",
+          });
+        });
     }
   };
 

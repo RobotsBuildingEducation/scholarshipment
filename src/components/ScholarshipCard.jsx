@@ -13,11 +13,14 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
+  useBreakpointValue,
 } from "@chakra-ui/react";
 import Carousel from "react-bootstrap/Carousel";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { ExternalLink } from "../elements/ExternalLink";
 import EditScholarshipDrawer from "./EditScholarshipDrawer"; // Import the drawer component
+import { BookMarkIcon } from "../assets/bookmarkIcon";
+import Markdown from "react-markdown";
 
 const ScholarshipCard = ({
   scholarship,
@@ -29,6 +32,7 @@ const ScholarshipCard = ({
 }) => {
   const toast = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const isMobile = useBreakpointValue({ base: true, md: false });
 
   const images = scholarship?.fileURLs || [];
   const booleanTags = [
@@ -39,7 +43,14 @@ const ScholarshipCard = ({
     { label: "Spotlight", value: scholarship.isSpotlight },
     { label: "Underserved", value: scholarship.isUnderserved },
   ];
-
+  let formatAmount = (amount) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
   return (
     <Box
       borderWidth={1}
@@ -47,19 +58,22 @@ const ScholarshipCard = ({
       textAlign="left"
       position="relative"
       style={{
-        border: "1px solid rgba(201, 201, 201 , 0.6)",
+        // border: "1px solid rgba(201, 201, 201 , 0.6)",
         width: "100%",
         minHeight: "70vh",
         boxShadow: "0px 12px 12px -6px rgba(42, 51, 69, 0.04)",
-        borderRadius: 32,
-        backgroundColor: "#e6e6e6",
+        borderRadius: !isMobile ? 32 : null,
+        backgroundColor: "rgba(255,255,255, 0.1)",
+        fontSize: 12,
       }}
     >
-      <div style={{ padding: 12, marginLeft: 12, paddingBottom: 0 }}>
+      <div style={{ padding: 18, marginLeft: 12, paddingBottom: 0 }}>
         <Heading as="h3" fontWeight="bold">
           {scholarship.name}
         </Heading>
-        <Text style={{ fontWeight: "bold" }}>{scholarship.amount}</Text>
+        <Text style={{ fontWeight: "bold" }}>
+          {formatAmount(scholarship.amount)}
+        </Text>
       </div>
       {images.length > 1 ? (
         <Carousel data-bs-theme="dark" touch={true} interval={null}>
@@ -92,13 +106,19 @@ const ScholarshipCard = ({
         {booleanTags?.map(
           (tag, index) =>
             tag.value && (
-              <Tag key={index} colorScheme="blue" size="sm">
+              <Tag
+                key={index}
+                style={{ backgroundColor: "#8B4E9E", color: "white" }}
+              >
                 {tag.label}
               </Tag>
             )
         )}
         {scholarship.tags?.map((tag, index) => (
-          <Tag key={index} colorScheme="green">
+          <Tag
+            key={index}
+            style={{ backgroundColor: "#C95F8F", color: "white" }}
+          >
             {tag}
           </Tag>
         ))}
@@ -121,14 +141,17 @@ const ScholarshipCard = ({
           <b>Due Date:</b> {scholarship?.dueDate || "-"}
         </Text>
         <Text>
-          <b>Eligibility:</b> {scholarship?.eligibility || "-"}
+          <b>Eligibility:</b>{" "}
+          <Markdown style={{ fontSize: 12 }}>
+            {scholarship?.eligibility || "-"}
+          </Markdown>
         </Text>
 
         <Accordion allowMultiple>
           <AccordionItem>
             <AccordionButton
               style={{
-                backgroundColor: "#D8D8D8",
+                backgroundColor: "transparent",
               }}
             >
               <Box flex="1" textAlign="left">
@@ -139,7 +162,7 @@ const ScholarshipCard = ({
             <AccordionPanel
               pb={4}
               style={{
-                backgroundColor: "#D8D8D8",
+                backgroundColor: "transparent",
               }}
             >
               <Text>
@@ -175,19 +198,19 @@ const ScholarshipCard = ({
           }}
           mt={2}
         >
-          Save
+          <BookMarkIcon />
         </Button>
         <Button
           onClick={() => {
             onSend(scholarship);
-            toast({
-              title: "Draft Created.",
-              description: "The draft has been created successfully.",
-              status: "info",
-              duration: 5000,
-              isClosable: true,
-              position: "top",
-            });
+            // toast({
+            //   title: "Draft Created.",
+            //   description: "The draft has been created successfully.",
+            //   status: "info",
+            //   duration: 5000,
+            //   isClosable: true,
+            //   position: "top",
+            // });
           }}
           mt={2}
           ml={2}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Box,
   Container,
@@ -44,6 +44,8 @@ const ScholarshipDetail = () => {
     useChatCompletion();
   const toast = useToast();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchDidKey = async () => {
@@ -237,6 +239,17 @@ const ScholarshipDetail = () => {
 
   return (
     <Container p={2}>
+      <Box
+        width={50}
+        as="img"
+        src={logo}
+        borderRadius="34%"
+        style={{ marginTop: 12, cursor: "pointer" }}
+        onClick={() => {
+          navigate(`/`);
+        }}
+      />
+      <br />
       {scholarship ? (
         <>
           <ScholarshipCard

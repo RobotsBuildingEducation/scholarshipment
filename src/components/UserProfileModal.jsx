@@ -17,6 +17,7 @@ import {
   MenuOptionGroup,
   Checkbox,
   CheckboxGroup,
+  FormLabel,
 } from "@chakra-ui/react";
 import { ChevronDownIcon } from "@chakra-ui/icons";
 import { updateDoc, doc } from "firebase/firestore";
@@ -92,16 +93,19 @@ const UserProfileDrawer = ({
         <DrawerHeader>Edit Profile and Filter Scholarships</DrawerHeader>
         <DrawerBody>
           <VStack spacing={4}>
-            <Input
-              placeholder="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <Input
+            <div>
+              <FormLabel>User name</FormLabel>
+              <Input
+                placeholder="User name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            {/* <Input
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-            />
+            /> */}
           </VStack>
           <br />
           <Menu closeOnSelect={false} mt={6}>

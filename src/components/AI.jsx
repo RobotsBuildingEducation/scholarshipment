@@ -54,9 +54,12 @@ const AI = ({ messages, handleSave, isSending, existingDraft, original }) => {
         p={3}
         borderBottom="1px solid #ddd"
       >
-        <Button size="sm" onClick={() => handleCopy(content)}>
-          {copiedMessageId === content ? "Copied" : "Copy"}
-        </Button>
+        {isEditing ? null : (
+          <Button size="sm" onClick={() => handleCopy(content)}>
+            {copiedMessageId === content ? "Copied" : "Copy"}
+          </Button>
+        )}
+
         <Button size="sm" onClick={() => handleEditToggle(content)}>
           {isEditing ? "View" : "Edit"}
         </Button>

@@ -26,12 +26,23 @@ import {
   useDisclosure,
   useBreakpointValue,
   Box,
+  useToast,
+  Skeleton,
+  SkeletonText,
+  HStack,
+  VStack,
+  Image,
+  Link,
 } from "@chakra-ui/react";
 import UserProfileModal from "./UserProfileModal";
 import { useChatCompletion } from "../hooks/useChatCompletion";
 import ScholarshipList from "./ScholarshipList";
 import AiDrawer from "./AiDrawer";
 import ResponsiveTabs from "../elements/ResponsiveTabs";
+import { SettingsIcon } from "@chakra-ui/icons";
+
+import logo_transparent from "../assets/logo_transparent.png";
+// import { SettingsIcon } from "../assets/settingsIcon";
 
 // const tabOrientation = useBreakpointValue({
 //   base: "vertical",
@@ -54,6 +65,8 @@ const Feed = ({ didKey, isAdminMode }) => {
     onOpen: onAiDrawerOpen,
     onClose: onAiDrawerClose,
   } = useDisclosure();
+
+  const isMobile = useBreakpointValue({ base: true, md: false });
 
   const [suggestedScholarships, setSuggestedScholarships] = useState([]);
   const [isFetchingUserData, setIsFetchingUserData] = useState(false);
@@ -82,6 +95,8 @@ const Feed = ({ didKey, isAdminMode }) => {
   const [isSending, setIsSending] = useState(false);
   const [viewMode, setViewMode] = useState("spotlight"); // Set initial view mode to spotlight
   const [recommendedScholarships, setRecommendedScholarships] = useState([]);
+
+  const toast = useToast({});
 
   function capitalizeFirstLetter(str) {
     return str[0].toUpperCase() + str.slice(1);
@@ -274,6 +289,8 @@ const Feed = ({ didKey, isAdminMode }) => {
           scholarship.isStateOnly === filters.isStateOnly)
       );
     });
+
+    console.log("filtered...");
     setFilteredScholarships(filtered);
   };
 
@@ -377,6 +394,7 @@ const Feed = ({ didKey, isAdminMode }) => {
           draftContent,
           originalContent:
             messages.length > 0 ? messages[messages.length - 1].content : "",
+          ...selectedScholarship,
         });
         abortResponse();
 
@@ -385,7 +403,16 @@ const Feed = ({ didKey, isAdminMode }) => {
         );
         setExistingDraft(draftContent);
         resetMessages();
-        console.log("Draft saved successfully:", draftContent);
+
+        toast({
+          title: "Draft Saved.",
+          description:
+            "The scholarship draft has been added to your drafts collection.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+          position: "top",
+        });
       } catch (error) {
         console.log("Error saving draft:", error);
       }
@@ -467,15 +494,99 @@ const Feed = ({ didKey, isAdminMode }) => {
   if (isFetchingUserData) {
     feedRender = (
       <>
-        <Spinner />
+        <Box
+          padding="6"
+          boxShadow="lg"
+          borderRadius="md"
+          width="100%"
+          mt="4"
+          ml="0"
+        >
+          {/* Main Content Skeleton */}
+          <VStack spacing="4" align="start">
+            <Skeleton
+              height="30px"
+              width="60%"
+              startColor="pink.100"
+              endColor="pink.300"
+            />
+            <Skeleton
+              height="20px"
+              width="40%"
+              startColor="pink.100"
+              endColor="pink.300"
+            />
+            <Skeleton
+              height="200px"
+              width="100%"
+              startColor="pink.100"
+              endColor="pink.300"
+            />
+            {/* Tabs Skeleton */}
+            <HStack spacing="4" mb="4">
+              <Skeleton
+                height="20px"
+                width="50px"
+                startColor="pink.100"
+                endColor="pink.300"
+              />
+              <Skeleton
+                height="20px"
+                width="50px"
+                startColor="pink.100"
+                endColor="pink.300"
+              />
+              <Skeleton
+                height="20px"
+                width="50px"
+                startColor="pink.100"
+                endColor="pink.300"
+              />
+              <Skeleton
+                height="20px"
+                width="50px"
+                startColor="pink.100"
+                endColor="pink.300"
+              />
+            </HStack>
+            <HStack spacing="4" mb="4">
+              <Skeleton
+                height="40px"
+                width="40px"
+                startColor="pink.100"
+                endColor="pink.300"
+              />
+              <Skeleton
+                height="40px"
+                width="40px"
+                startColor="pink.100"
+                endColor="pink.300"
+              />
+            </HStack>
+            <SkeletonText
+              mt="4"
+              noOfLines={4}
+              spacing="4"
+              width="100%"
+              startColor="pink.100"
+              endColor="pink.300"
+            />
+          </VStack>
+        </Box>
       </>
     );
   } else {
     feedRender = (
       <>
         {isRenderingSpotlight ? (
-          <>
-            <Heading as="h3" size="lg" style={{ marginTop: 4 }}>
+          <div
+            style={{
+              paddingTop: 16,
+              paddingBottom: 16,
+              marginTop: isMobile ? null : "-52px",
+            }}
+          >
+            <Heading as="h3" size="lg">
               Spotlight
             </Heading>
             <ScholarshipList
@@ -486,27 +597,17 @@ const Feed = ({ didKey, isAdminMode }) => {
               onUpdate={handleUpdateScholarship}
               isAdminMode={isAdminMode}
             />
-          </>
+          </div>
         ) : null}
         <>
-          {viewMode === "spotlight" ? null : (
+          {/* {viewMode === "spotlight" ? null : (
             <Heading as="h3" size="lg">
               {capitalizeFirstLetter(viewMode)}
             </Heading>
-          )}
+          )} */}
           {viewMode === "all" && (
             <ScholarshipList
               scholarships={filteredScholarships}
-              onSaveScholarship={handleSaveScholarship}
-              onSend={onSend}
-              onDelete={handleDeleteScholarship}
-              onUpdate={handleUpdateScholarship}
-              isAdminMode={isAdminMode}
-            />
-          )}
-          {viewMode === "drafts" && (
-            <ScholarshipList
-              scholarships={drafts}
               onSaveScholarship={handleSaveScholarship}
               onSend={onSend}
               onDelete={handleDeleteScholarship}
@@ -524,6 +625,17 @@ const Feed = ({ didKey, isAdminMode }) => {
               isAdminMode={isAdminMode}
             />
           )}
+          {viewMode === "drafts" && (
+            <ScholarshipList
+              scholarships={drafts}
+              onSaveScholarship={handleSaveScholarship}
+              onSend={onSend}
+              onDelete={handleDeleteScholarship}
+              onUpdate={handleUpdateScholarship}
+              isAdminMode={isAdminMode}
+            />
+          )}
+
           {viewMode === "recommended" && (
             <ScholarshipList
               scholarships={recommendedScholarships}
@@ -540,12 +652,34 @@ const Feed = ({ didKey, isAdminMode }) => {
   }
 
   return (
-    <Container p={2}>
+    <Container
+      style={{ paddingTop: 12, paddingInlineEnd: 0, paddingInlineStart: 0 }}
+    >
+      {/* <Banner /> */}
+      {/* <Button onClick={onUserProfileOpen}>User Profile</Button> */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <Link
+          href="https://girlsoncampus.org"
+          isExternal
+          style={{ display: "flex", alignItems: "center" }}
+        >
+          <Image src={logo_transparent} height="18px" objectFit="cover" />
+          &nbsp;Connect
+        </Link>
+        &nbsp; &nbsp;
+        <Button onClick={onUserProfileOpen}>
+          <SettingsIcon
+            style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
+          />
+          &nbsp;&nbsp;Settings
+        </Button>
+      </div>
       <br />
-      <Button onClick={onUserProfileOpen}>User Profile</Button>
-      <br />
-      <br />
-
       <br />
       <Box overflowX="auto">
         <ResponsiveTabs
@@ -559,6 +693,7 @@ const Feed = ({ didKey, isAdminMode }) => {
         >
           {feedRender}
         </ResponsiveTabs>
+
         {isRenderingSpotlight ? <div>{feedRender}</div> : null}
       </Box>
       <UserProfileModal

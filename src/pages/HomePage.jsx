@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Web5 } from "@web5/api/browser";
 import { doc, setDoc } from "firebase/firestore";
 import { database } from "../database/setup";
-import { Box, Input, keyframes } from "@chakra-ui/react";
+import { Box, Input, keyframes, Skeleton } from "@chakra-ui/react";
 
 import Feed from "../components/Feed";
 import logo from "../assets/logo.png";
@@ -96,7 +96,7 @@ const HomePage = ({ isAdminMode = false }) => {
     setPasscode(e.target.value);
   };
 
-  if (loading)
+  if (loading && !localStorage.getItem("uniqueId"))
     return (
       <Box
         height="100vh"
@@ -105,13 +105,16 @@ const HomePage = ({ isAdminMode = false }) => {
         justifyContent="center"
         animation={`${fadeIn} 1s ease-in-out`}
       >
-        <Box
-          width={200}
-          as="img"
-          src={logo}
+        <Skeleton
+          height="200px"
+          width="200px"
+          startColor="pink.500"
+          endColor="orange.500"
           borderRadius="34%"
           animation={`${rotate} 3s linear infinite, ${fluidDrop} 3s ease-in-out infinite`}
-        />
+        >
+          <Box width={200} as="img" src={logo} borderRadius="34%" />
+        </Skeleton>
       </Box>
     );
 

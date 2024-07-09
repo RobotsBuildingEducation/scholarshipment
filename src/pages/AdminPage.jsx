@@ -384,7 +384,6 @@ const AdminPage = () => {
               <Input
                 style={{ border: "1px solid darkgray" }}
                 name="year"
-                type="number"
                 value={formData.year}
                 onChange={handleChange}
               />
