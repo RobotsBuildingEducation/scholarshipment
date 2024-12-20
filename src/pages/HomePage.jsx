@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Web5 } from "@web5/api/browser";
+// import { Web5 } from "@web5/api/browser";
+import { DidDht } from "@web5/dids";
+import { DidJwk } from "@web5/dids";
+
 import { doc, setDoc } from "firebase/firestore";
 import { database } from "../database/setup";
 import { Box, Input, keyframes, Skeleton } from "@chakra-ui/react";
 
 import Feed from "../components/Feed";
-import logo from "../assets/logo.png";
+import logo_transparent from "../assets/logo_transparent.png";
 
 // Define keyframes for animations
 const rotate = keyframes`
@@ -61,17 +64,37 @@ const HomePage = ({ isAdminMode = false }) => {
     const id = localStorage.getItem("uniqueId");
     if (!id) {
       try {
-        setIsNewUser(true);
-        const { web5 } = await Web5.connect();
-        const id = web5?.did?.agent?.agentDid;
-        localStorage.setItem("uniqueId", id);
+        const didDht = await DidDht.create({ publish: true });
 
+        // DID and its associated data which can be exported and used in different contexts/apps
+        // const portableDid = await didDht.export();
+
+        // DID string
+        const did = didDht.uri;
+
+        // DID Document
+        // console.log("did dht", didDht);
+        // console.log("document", didDht.document);
+        // const didDocument = JSON.stringify(didDht.document);
+        // console.log("did st", didDocument);
+        setIsNewUser(true);
+        // const { web5 } = await Web5.connect();
+        // const id = web5?.did?.agent?.agentDid;
+        // // const id = "test";
+        // console.log("web5", web5);
+        // console.log("id", id);
+        let id = did;
+        localStorage.setItem("uniqueId", id);
         setDidKey(id); // For simplicity, using DID as the key for now.
         await setDoc(doc(database, "users", id), {
           createdAt: new Date().toISOString(),
         });
       } catch (error) {
-        checkUser();
+        // localStorage.setItem("uniqueId", "global");
+        // await setDoc(doc(database, "users", id), {
+        //   createdAt: new Date().toISOString(),
+        // });
+        // checkUser();
       }
     } else {
       console.log("oh...");
@@ -85,7 +108,7 @@ const HomePage = ({ isAdminMode = false }) => {
     setTimeout(() => {
       console.log("running y");
       setLoading(false);
-    }, 1500);
+    }, 1000);
   };
 
   useEffect(() => {
@@ -96,6 +119,8 @@ const HomePage = ({ isAdminMode = false }) => {
     setPasscode(e.target.value);
   };
 
+  console.log("didKey", didKey);
+
   if (loading && !localStorage.getItem("uniqueId"))
     return (
       <Box
@@ -105,16 +130,16 @@ const HomePage = ({ isAdminMode = false }) => {
         justifyContent="center"
         animation={`${fadeIn} 1s ease-in-out`}
       >
-        <Skeleton
+        <Box
           height="200px"
           width="200px"
           startColor="pink.500"
           endColor="orange.500"
           borderRadius="34%"
-          animation={`${rotate} 3s linear infinite, ${fluidDrop} 3s ease-in-out infinite`}
+          animation={`${rotate} 5s linear infinite, ${fluidDrop} 5s ease-in-out infinite`}
         >
-          <Box width={200} as="img" src={logo} borderRadius="34%" />
-        </Skeleton>
+          <Box width={200} as="img" src={logo_transparent} borderRadius="34%" />
+        </Box>
       </Box>
     );
 

@@ -14,7 +14,14 @@ const newTheme = {
   },
 };
 
-const AI = ({ messages, handleSave, isSending, existingDraft, original }) => {
+const AI = ({
+  messages,
+  handleSave,
+  isSending,
+  existingDraft,
+  original,
+  fireScholarshipResponse,
+}) => {
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
@@ -55,19 +62,20 @@ const AI = ({ messages, handleSave, isSending, existingDraft, original }) => {
         borderBottom="1px solid #ddd"
       >
         {isEditing ? null : (
-          <Button size="sm" onClick={() => handleCopy(content)}>
-            {copiedMessageId === content ? "Copied" : "Copy"}
-          </Button>
+          <>
+            <Button size="sm" onClick={() => handleCopy(content)}>
+              {copiedMessageId === content ? "Copied" : "Copy"}
+            </Button>
+            &nbsp;
+          </>
         )}
-
         <Button size="sm" onClick={() => handleEditToggle(content)}>
           {isEditing ? "View" : "Edit"}
         </Button>
-
+        &nbsp;
         <Button size="sm" onClick={handleSaveEdit}>
           Save
         </Button>
-
         {/* {original ? (
           <Button size="sm" onClick={() => handleEditToggle(original)}>
             Reset
@@ -94,10 +102,12 @@ const AI = ({ messages, handleSave, isSending, existingDraft, original }) => {
 
   return (
     <>
-      <Text>Creating data based off user profile and scholarship data</Text>
-      <br />
-      <br />
+      <Text>
+        Creates a draft essay based off user profile and scholarship data
+      </Text>
+
       {existingDraft && renderContent(existingDraft, "existing-draft")}
+      {/* {} */}
       {messages.length > 0 &&
         !existingDraft &&
         messages.map((msg, i) => {
@@ -106,6 +116,9 @@ const AI = ({ messages, handleSave, isSending, existingDraft, original }) => {
           }
           return null;
         })}
+      {fireScholarshipResponse.length > 0 &&
+        !existingDraft &&
+        renderContent(fireScholarshipResponse`msg-${i}`)}
     </>
   );
 };

@@ -12,7 +12,7 @@ import {
   setDoc,
   deleteDoc,
 } from "firebase/firestore";
-import { database } from "../database/setup";
+import { database, model } from "../database/setup";
 import {
   Container,
   Heading,
@@ -42,6 +42,7 @@ import ResponsiveTabs from "../elements/ResponsiveTabs";
 import { SettingsIcon } from "@chakra-ui/icons";
 
 import logo_transparent from "../assets/logo_transparent.png";
+import EditProfileModal from "./EditProfileModal";
 // import { SettingsIcon } from "../assets/settingsIcon";
 
 // const tabOrientation = useBreakpointValue({
@@ -78,6 +79,7 @@ const Feed = ({ didKey, isAdminMode }) => {
   const [tempFilters, setTempFilters] = useState({});
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [description, setDescription] = useState("");
   const [isRenderingSpotlight, setIsRenderingSpotlight] = useState(true);
   const [selectedScholarship, setSelectedScholarship] = useState(null);
   const [formText, setFormText] = useState("");
@@ -98,48 +100,84 @@ const Feed = ({ didKey, isAdminMode }) => {
 
   const toast = useToast({});
 
+  const [fireScholarshipResponse, setFireScholarshipResponse] = useState("");
+
+  const fetchGoogleAI = async (scholarship, userData) => {
+    console.log("running google");
+    // Provide a prompt that contains text
+    // const prompt = "Write a story about a magic backpack.";
+
+    const prompt = `Draft a high quality scholarship essay in clean minimalist markdown without headers. The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
+      scholarship
+    )} Additionally, the user may have provided information about them personally, to make the essay draft more realistic. ${JSON.stringify(
+      userData
+    )}`;
+
+    // To stream generated text output, call generateContentStream with the text input
+    const result = await model.generateContentStream(prompt);
+    console.log("result", result);
+
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      console.log(chunkText);
+      setFireScholarshipResponse((prevText) => prevText + chunkText);
+    }
+
+    console.log("aggregated response: ", await result.response);
+  };
   function capitalizeFirstLetter(str) {
     return str[0].toUpperCase() + str.slice(1);
   }
 
   const onSend = async (scholarship) => {
-    try {
-      setIsSending(true);
-      setSelectedScholarship(scholarship);
-      handleOpenSaveModal(scholarship);
+    setIsSending(true);
+    setSelectedScholarship(scholarship);
+    handleOpenSaveModal(scholarship);
 
-      const draftDocRef = doc(
-        database,
-        `users/${didKey}/drafts`,
-        scholarship.id
-      );
-      const draftDoc = await getDoc(draftDocRef);
+    const draftDocRef = doc(database, `users/${didKey}/drafts`, scholarship.id);
+    const draftDoc = await getDoc(draftDocRef);
 
-      console.log("Scholarship being processed...", scholarship);
-      if (draftDoc?.exists()) {
-        const draftData = draftDoc.data();
-        setExistingDraft(draftData.draftContent);
-        setOriginalDraft(draftData?.originalContent);
-        setFormText(draftData.draftContent);
-        setIsSending(false);
-      } else {
-        await submitPrompt([
-          {
-            content: `Draft a sample scholarship essay in clean minimalist markdown without headers. 
-            The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
-              scholarship
-            )}`,
-            role: "user",
-          },
-        ]);
-        setPromptData("");
-        console.log("done");
-        setIsSending(false);
-      }
-    } catch (error) {
-      console.log("error", { error });
+    const userDocRef = await doc(database, "users", didKey);
+    const userDoc = await getDoc(userDocRef);
+
+    const userData = userDoc.data();
+
+    console.log("Scholarship being processed...", scholarship);
+
+    console.log("user data", userData);
+    if (draftDoc?.exists()) {
+      const draftData = draftDoc.data();
+      setExistingDraft(draftData.draftContent);
+      setOriginalDraft(draftData?.originalContent);
+      setFormText(draftData.draftContent);
+      setIsSending(false);
+    } else {
+      // await submitPrompt([
+      //   {
+      //     content: `Draft a high quality scholarship essay in clean minimalist markdown without headers.
+
+      //     The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
+      //       scholarship
+      //     )}
+
+      //     Additionally, the user may have provided information about them personally, to make the essay draft more realistic. ${JSON.stringify(
+      //       userData
+      //     )}
+      //     `,
+
+      //     role: "user",
+      //   },
+      // ]);
+
+      fetchGoogleAI(scholarship, userData);
+      setPromptData("");
+      console.log("done");
       setIsSending(false);
     }
+    // } catch (error) {
+    //   console.log("error", { error });
+    //   setIsSending(false);
+    // }
   };
 
   const fetchUserData = async () => {
@@ -152,6 +190,7 @@ const Feed = ({ didKey, isAdminMode }) => {
         const userData = userDoc.data();
         setName(userData.name || "");
         setEmail(userData.email || "");
+        setDescription(userData.description || "");
         if (userData.filters) {
           setTempFilters(userData.filters);
           setFilters(userData.filters);
@@ -201,6 +240,11 @@ const Feed = ({ didKey, isAdminMode }) => {
       }
     }
   };
+
+  useEffect(() => {
+    console.log("running ai..");
+    // fetchGoogleAI();
+  }, []);
 
   useEffect(() => {
     setIsRenderingSpotlight(true);
@@ -586,7 +630,7 @@ const Feed = ({ didKey, isAdminMode }) => {
               marginTop: isMobile ? null : "-52px",
             }}
           >
-            <Heading as="h3" size="lg">
+            <Heading as="h3" size="lg" border="1px solid red">
               Spotlight
             </Heading>
             <ScholarshipList
@@ -651,16 +695,21 @@ const Feed = ({ didKey, isAdminMode }) => {
     );
   }
 
+  console.log("description", description);
   return (
     <Container
+      border="1px solid green"
+      width="100%"
       style={{ paddingTop: 12, paddingInlineEnd: 0, paddingInlineStart: 0 }}
     >
       {/* <Banner /> */}
       {/* <Button onClick={onUserProfileOpen}>User Profile</Button> */}
+
       <div
         style={{
           display: "flex",
           alignItems: "center",
+          padding: 12,
         }}
       >
         <Link
@@ -693,15 +742,15 @@ const Feed = ({ didKey, isAdminMode }) => {
         >
           {feedRender}
         </ResponsiveTabs>
-
         {isRenderingSpotlight ? <div>{feedRender}</div> : null}
       </Box>
-      <UserProfileModal
+      <EditProfileModal
         isOpen={isUserProfileOpen}
         onClose={onUserProfileClose}
         didKey={didKey}
         initialName={name}
         initialEmail={email}
+        initialDescription={description}
         tempFilters={tempFilters}
         setTempFilters={setTempFilters}
         handleSaveSettings={handleSaveSettings}
@@ -718,6 +767,7 @@ const Feed = ({ didKey, isAdminMode }) => {
         onSaveDraft={handleSaveDraft}
         isSending={isSending}
         original={originalDraft}
+        fireScholarshipResponse={fireScholarshipResponse}
       />
     </Container>
   );

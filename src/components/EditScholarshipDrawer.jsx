@@ -84,6 +84,7 @@ const EditScholarshipDrawer = ({ isOpen, onClose, scholarship, onUpdate }) => {
       onClose={onClose}
       closeOnOverlayClick={false}
       blockScrollOnMount={false}
+      size="md"
     >
       <DrawerOverlay />
       <DrawerContent>

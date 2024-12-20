@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getVertexAI, getGenerativeModel } from "@firebase/vertexai";
 
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -24,5 +25,10 @@ export const app = initializeApp(firebaseConfig);
 const database = getFirestore(app);
 const analytics = getAnalytics(app);
 const storage = getStorage(app);
+const vertexAI = getVertexAI(app);
 
-export { database, storage };
+// Initialize the generative model with a model that supports your use case
+// Gemini 1.5 models are versatile and can be used with all API capabilities
+const model = getGenerativeModel(vertexAI, { model: "gemini-1.5-flash" });
+
+export { database, storage, vertexAI, model };

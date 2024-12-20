@@ -60,7 +60,7 @@ export const ExternalLink = ({
         .then(() => {
           toast({
             title: "Link copied",
-            description: "The link has been copied 📢 ❗❗❗❗❗",
+            // description: "The link has been copied 📢 ❗❗❗❗❗",
             status: "info",
             duration: 2000,
             isClosable: true,

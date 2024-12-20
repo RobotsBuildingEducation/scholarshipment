@@ -1,37 +1,35 @@
 import React, { useState, useEffect } from "react";
 import {
+  Container,
+  Box,
+  Heading,
   Input,
   Textarea,
   NumberInput,
   NumberInputField,
   Checkbox,
+  Wrap,
+  Tag,
   Button,
-  Box,
-  Container,
-  Heading,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
+  Grid,
+  GridItem,
   FormControl,
   FormLabel,
-  Tag,
-  TagLabel,
-  TagCloseButton,
-  HStack,
   VStack,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItemOption,
-  MenuOptionGroup,
+  TagCloseButton,
 } from "@chakra-ui/react";
-import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
-import { database } from "../database/setup";
-import { ChevronDownIcon } from "@chakra-ui/icons";
+import ScholarshipBuilder from "../components/ScholarshipBuilder";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../database/setup";
+import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
+import { database } from "../database/setup";
 
 const AdminPage = () => {
-  const [password, setPassword] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [tagInput, setTagInput] = useState("");
   const [formData, setFormData] = useState({
     collectionType: [],
     name: "",
@@ -51,12 +49,15 @@ const AdminPage = () => {
     isInternational: false,
     isStateOnly: false,
     isSpotlight: false,
+    fileURLs: [], // Holds URLs of uploaded files
   });
+
+  const [tagInput, setTagInput] = useState("");
   const [files, setFiles] = useState([]);
-  const [downloadURLs, setDownloadURLs] = useState([]);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
-
+  const [password, setPassword] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD;
 
   useEffect(() => {
@@ -66,34 +67,11 @@ const AdminPage = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (password === correctPassword) {
-      localStorage.setItem("adminPassword", password);
-      setIsLoggedIn(true);
-    }
-  }, [password]);
-
-  const handlePasswordChange = (e) => {
-    setPassword(e.target.value);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("adminPassword");
-    setIsLoggedIn(false);
-  };
-
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prevData) => ({
       ...prevData,
       [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
-  const handleSelectChange = (value) => {
-    setFormData((prevData) => ({
-      ...prevData,
-      collectionType: value,
     }));
   };
 
@@ -127,12 +105,20 @@ const AdminPage = () => {
 
   const handleFileChange = (e) => {
     if (e.target.files) {
-      setFiles([...e.target.files]);
+      const newFiles = Array.from(e.target.files);
+      setFiles(newFiles);
+
+      // Generate preview URLs for the selected files
+      const fileURLs = newFiles.map((file) => URL.createObjectURL(file));
+      setFormData((prevData) => ({
+        ...prevData,
+        fileURLs: fileURLs,
+      }));
     }
   };
 
   const handleUpload = async (scholarshipId) => {
-    if (files.length === 0) return;
+    if (files.length === 0) return [];
 
     const uploadPromises = files.map((file) => {
       return new Promise((resolve, reject) => {
@@ -165,7 +151,10 @@ const AdminPage = () => {
 
     try {
       const urls = await Promise.all(uploadPromises);
-      setDownloadURLs(urls);
+      setFormData((prevData) => ({
+        ...prevData,
+        fileURLs: urls,
+      }));
       setFiles([]);
       setProgress(0);
       setError("");
@@ -179,7 +168,6 @@ const AdminPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Create the scholarship document first to get the ID
       const scholarshipRef = await addDoc(
         collection(database, "scholarships"),
         {
@@ -189,11 +177,8 @@ const AdminPage = () => {
       );
       const scholarshipId = scholarshipRef.id;
 
-      // Upload the files to the subdirectory with the scholarship ID
       const fileUploadResult = await handleUpload(scholarshipId);
-      console.log("upload complete", fileUploadResult);
 
-      // Update the scholarship document with the download URLs
       await updateDoc(doc(database, "scholarships", scholarshipId), {
         fileURLs: fileUploadResult,
       });
@@ -218,229 +203,236 @@ const AdminPage = () => {
         isInternational: false,
         isStateOnly: false,
         isSpotlight: false,
+        fileURLs: [],
       });
-      setDownloadURLs([]);
+      setFiles([]);
     } catch (error) {
       console.error("Error adding document: ", error);
     }
   };
 
-  const renderCheckmarks = formData.collectionType.includes("Latest");
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
+  };
 
-  const collectionOptions = [
-    "Latest",
-    "Highschool",
-    "International",
-    "Underserved",
-    "Undergraduate",
-    "Graduate",
-    "Major",
-    "Networking",
-    "Student Loan Resources",
-    "Rolling Scholarships",
-  ];
+  const handleLogout = () => {
+    localStorage.removeItem("adminPassword");
+    setIsLoggedIn(false);
+  };
+
+  const handleLogin = () => {
+    if (password === correctPassword) {
+      localStorage.setItem("adminPassword", password);
+      setIsLoggedIn(true);
+    }
+  };
 
   if (isLoggedIn) {
     return (
       <Container>
         <Box>
+          <br />
+          <br />
           <Heading as="h2" size="xl" mb={4}>
-            Create
+            Create Scholarship
           </Heading>
+          <Checkbox
+            name="isSpotlight"
+            isChecked={formData.isSpotlight}
+            onChange={handleChange}
+            sx={{
+              "& .chakra-checkbox__control": {
+                borderColor: "black",
+              },
+            }}
+          >
+            Spotlight
+          </Checkbox>
+          <br />
+          <br />
+          <Grid templateColumns="repeat(2, 1fr)" gap={4}>
+            <GridItem colSpan={2}>
+              <FormLabel htmlFor="name">Name</FormLabel>
 
-          <div>
-            <h1>Upload Files</h1>
-            <div>
               <Input
-                style={{ border: "1px solid darkgray", height: 200 }}
-                multiple
-                type="file"
-                onChange={handleFileChange}
-              />
-              <Button onClick={handleUpload}>Upload</Button>
-              <div>{progress > 0 && `Upload is ${progress}% done`}</div>
-              {error && <div>Error: {error}</div>}
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <FormControl id="collectionType" mb={4}>
-              <FormLabel>Collection Type (select multiple)</FormLabel>
-              <Menu closeOnSelect={false}>
-                <MenuButton as={Button} rightIcon={<ChevronDownIcon />}>
-                  Select Options
-                </MenuButton>
-                <MenuList>
-                  <MenuOptionGroup
-                    defaultValue={formData.collectionType}
-                    title="Options"
-                    type="checkbox"
-                    onChange={handleSelectChange}
-                  >
-                    {collectionOptions.map((option, index) => (
-                      <MenuItemOption key={index} value={option}>
-                        {option}
-                      </MenuItemOption>
-                    ))}
-                  </MenuOptionGroup>
-                </MenuList>
-              </Menu>
-
-              <HStack mt={2} wrap="wrap">
-                {formData.collectionType.map((option, index) => (
-                  <Tag
-                    key={index}
-                    size="md"
-                    borderRadius="full"
-                    variant="solid"
-                    colorScheme="teal"
-                  >
-                    <TagLabel>{option}</TagLabel>
-                    <TagCloseButton
-                      onClick={() =>
-                        handleSelectChange(
-                          formData.collectionType.filter((o) => o !== option)
-                        )
-                      }
-                    />
-                  </Tag>
-                ))}
-              </HStack>
-              <br />
-
-              {renderCheckmarks && (
-                <VStack align="start" spacing={2} mb={4}>
-                  <Checkbox
-                    name="isHighschool"
-                    isChecked={formData.isHighschool}
-                    onChange={handleChange}
-                  >
-                    Highschool
-                  </Checkbox>
-                  <Checkbox
-                    name="isCollege"
-                    isChecked={formData.isCollege}
-                    onChange={handleChange}
-                  >
-                    College
-                  </Checkbox>
-                  <Checkbox
-                    name="isUnderserved"
-                    isChecked={formData.isUnderserved}
-                    onChange={handleChange}
-                  >
-                    Underserved
-                  </Checkbox>
-                  <Checkbox
-                    name="isInternational"
-                    isChecked={formData.isInternational}
-                    onChange={handleChange}
-                  >
-                    International
-                  </Checkbox>
-                  <Checkbox
-                    name="isStateOnly"
-                    isChecked={formData.isStateOnly}
-                    onChange={handleChange}
-                  >
-                    State Only
-                  </Checkbox>
-                </VStack>
-              )}
-            </FormControl>
-
-            <FormControl id="isSpotlight" mb={4}>
-              <Checkbox
-                name="isSpotlight"
-                isChecked={formData.isSpotlight}
-                onChange={handleChange}
-                style={{ border: "3px solid blue", padding: 12 }}
-              >
-                Spotlight?
-              </Checkbox>
-            </FormControl>
-
-            <FormControl id="name" mb={4}>
-              <FormLabel>Name</FormLabel>
-              <Input
-                style={{ border: "1px solid darkgray" }}
+                style={{ border: "1px solid black" }}
+                placeholder="Name"
                 name="name"
+                id="name"
                 value={formData.name}
                 onChange={handleChange}
               />
-            </FormControl>
-            <FormControl id="dueDate" mb={4}>
-              <FormLabel>Due Date</FormLabel>
+            </GridItem>
+            <GridItem colSpan={2}>
+              <FormLabel htmlFor="link">Link</FormLabel>
+
               <Input
-                style={{ border: "1px solid darkgray" }}
-                name="dueDate"
-                type="date"
-                value={formData.dueDate}
-                onChange={handleChange}
-              />
-            </FormControl>
-            <FormControl id="year" mb={4}>
-              <FormLabel>Year</FormLabel>
-              <Input
-                style={{ border: "1px solid darkgray" }}
-                name="year"
-                value={formData.year}
-                onChange={handleChange}
-              />
-            </FormControl>
-            <FormControl id="eligibility" mb={4}>
-              <FormLabel>Eligibility</FormLabel>
-              <Textarea
-                style={{ border: "1px solid darkgray" }}
-                name="eligibility"
-                value={formData.eligibility}
-                onChange={handleChange}
-              />
-            </FormControl>
-            <FormControl id="major" mb={4}>
-              <FormLabel>Major</FormLabel>
-              <Input
-                style={{ border: "1px solid darkgray" }}
-                name="major"
-                value={formData.major}
-                onChange={handleChange}
-              />
-            </FormControl>
-            <FormControl id="amount" mb={4}>
-              <FormLabel>Amount</FormLabel>
-              <NumberInput
-                value={formData.amount}
-                onChange={handleAmountChange}
-              >
-                <NumberInputField />
-              </NumberInput>
-            </FormControl>
-            <FormControl id="ethnicity" mb={4}>
-              <FormLabel>Ethnicity</FormLabel>
-              <Input
-                style={{ border: "1px solid darkgray" }}
-                name="ethnicity"
-                value={formData.ethnicity}
-                onChange={handleChange}
-              />
-            </FormControl>
-            <FormControl id="link" mb={4}>
-              <FormLabel>Link</FormLabel>
-              <Input
-                style={{ border: "1px solid darkgray" }}
+                style={{ border: "1px solid black" }}
+                placeholder="Link"
                 name="link"
                 type="url"
                 value={formData.link}
                 onChange={handleChange}
               />
-            </FormControl>
-            <FormControl id="tags" mb={4}>
-              <FormLabel>Tags (press enter to create)</FormLabel>
+            </GridItem>
+            <GridItem colSpan={1}>
+              <FormLabel htmlFor="amount">Amount</FormLabel>
+              <NumberInput
+                name="amount"
+                id="amount"
+                style={{ border: "1px solid black" }}
+                value={formData.amount}
+                onChange={handleAmountChange}
+              >
+                <NumberInputField placeholder="Amount" />
+              </NumberInput>
+            </GridItem>
+            <GridItem colSpan={1}>
+              <FormLabel htmlFor="major">Major</FormLabel>
               <Input
-                style={{ border: "1px solid darkgray" }}
+                style={{ border: "1px solid black" }}
+                placeholder="Major"
+                name="major"
+                value={formData.major}
+                onChange={handleChange}
+              />
+            </GridItem>
+            <GridItem colSpan={1}>
+              <FormLabel htmlFor="dueDate">Due Date</FormLabel>
+
+              <Input
+                style={{ border: "1px solid black" }}
+                placeholder="Due Date"
+                id="dueDate"
+                name="dueDate"
+                type="date"
+                value={formData.dueDate}
+                onChange={handleChange}
+              />
+            </GridItem>
+            <GridItem colSpan={1}>
+              <FormLabel htmlFor="year">Year</FormLabel>
+
+              <Input
+                id="year"
+                style={{ border: "1px solid black" }}
+                placeholder="Semester or year"
+                name="year"
+                value={formData.year}
+                onChange={handleChange}
+              />
+            </GridItem>
+
+            <GridItem colSpan={2}>
+              <FormLabel htmlFor="eligibility">Eligibility</FormLabel>
+
+              <Textarea
+                style={{ border: "1px solid black" }}
+                placeholder="Eligibility"
+                name="eligibility"
+                value={formData.eligibility}
+                onChange={handleChange}
+              />
+            </GridItem>
+            {/* <GridItem colSpan={1}>
+            <FormLabel htmlFor="eligibility">Eligibility</FormLabel>
+
+              <Input
+                style={{ border: "1px solid black" }}
+                placeholder="Ethnicity"
+                name="ethnicity"
+                value={formData.ethnicity}
+                onChange={handleChange}
+              />
+            </GridItem> */}
+
+            <GridItem colSpan={2}>
+              <FormLabel htmlFor="details">Details</FormLabel>
+              <Textarea
+                id="details"
+                style={{ border: "1px solid black" }}
+                placeholder="Details"
+                name="details"
+                value={formData.details}
+                onChange={handleChange}
+              />
+            </GridItem>
+            <GridItem colSpan={2}>
+              <FormLabel htmlFor="tags">Tags</FormLabel>
+
+              <VStack align="start">
+                <Checkbox
+                  name="isHighschool"
+                  isChecked={formData.isHighschool}
+                  onChange={handleChange}
+                  colorScheme="purple"
+                  sx={{
+                    "& .chakra-checkbox__control": {
+                      borderColor: "black",
+                    },
+                  }}
+                >
+                  High School
+                </Checkbox>
+                <Checkbox
+                  name="isCollege"
+                  isChecked={formData.isCollege}
+                  onChange={handleChange}
+                  sx={{
+                    "& .chakra-checkbox__control": {
+                      borderColor: "black",
+                    },
+                  }}
+                >
+                  College
+                </Checkbox>
+                <Checkbox
+                  name="isUnderserved"
+                  isChecked={formData.isUnderserved}
+                  onChange={handleChange}
+                  sx={{
+                    "& .chakra-checkbox__control": {
+                      borderColor: "black",
+                    },
+                  }}
+                >
+                  Underserved
+                </Checkbox>
+                <Checkbox
+                  name="isInternational"
+                  isChecked={formData.isInternational}
+                  onChange={handleChange}
+                  sx={{
+                    "& .chakra-checkbox__control": {
+                      borderColor: "black",
+                    },
+                  }}
+                >
+                  International
+                </Checkbox>
+                <Checkbox
+                  name="isStateOnly"
+                  isChecked={formData.isStateOnly}
+                  onChange={handleChange}
+                  sx={{
+                    "& .chakra-checkbox__control": {
+                      borderColor: "black",
+                    },
+                  }}
+                >
+                  State Only
+                </Checkbox>
+              </VStack>
+            </GridItem>
+            <GridItem colSpan={2}>
+              <FormLabel htmlFor="tags">Custom Tags</FormLabel>
+
+              <Input
+                id="tags"
+                style={{ border: "1px solid black" }}
+                placeholder="Tags (press enter to submit a tag)"
                 value={tagInput}
                 onChange={handleTagInputChange}
-                placeholder="Add a tag and press enter"
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -448,47 +440,68 @@ const AdminPage = () => {
                   }
                 }}
               />
-              <HStack spacing={4} mt={2}>
+              <Wrap mt={2}>
                 {formData.tags.map((tag, index) => (
                   <Tag
                     key={index}
-                    size="md"
-                    borderRadius="full"
-                    variant="solid"
-                    colorScheme="teal"
+                    style={{ backgroundColor: "#C95F8F", color: "white" }}
+                    onClick={() => handleRemoveTag(tag)}
                   >
-                    <TagLabel>{tag}</TagLabel>
-                    <TagCloseButton onClick={() => handleRemoveTag(tag)} />
+                    {tag}
+                    <TagCloseButton />
                   </Tag>
                 ))}
-              </HStack>
-            </FormControl>
-            <FormControl id="details" mb={4}>
-              <FormLabel>Details</FormLabel>
-              <Textarea
-                name="details"
-                value={formData.details}
-                onChange={handleChange}
-                style={{ border: "1px solid darkgray" }}
-              />
-            </FormControl>
-            <FormControl id="meta" mb={4}>
-              <FormLabel>Meta</FormLabel>
-              <Textarea
-                name="meta"
-                value={formData.meta}
-                onChange={handleChange}
-                placeholder="Add content about the resource to inform the AI when users ask to generate content"
-              />
-            </FormControl>
-            <Button type="submit" colorScheme="teal" mb={4}>
-              Publish Scholarship
-            </Button>
-          </form>
-          <Button onClick={handleLogout} colorScheme="red">
-            Logout
+              </Wrap>
+            </GridItem>
+
+            <GridItem colSpan={2}>
+              <FormControl>
+                <FormLabel>Upload Files</FormLabel>
+                <Input
+                  type="file"
+                  onChange={handleFileChange}
+                  multiple
+                  style={{
+                    border: "1px solid transparent",
+                  }}
+                />
+                <div>{progress > 0 && `Upload is ${progress}% done`}</div>
+                {error && <div>Error: {error}</div>}
+              </FormControl>
+            </GridItem>
+            <br />
+          </Grid>
+          <br />
+          <br />
+          {/* <Box flex="1" textAlign="left">
+            Preview Scholarship
+          </Box> */}
+          <ScholarshipBuilder formData={formData} />
+          {/* <Accordion allowToggle mt={4} style={{ border: "1px solid gray" }}>
+            <AccordionItem>
+              <AccordionButton>
+                <Box flex="1" textAlign="left">
+                  Preview Scholarship
+                </Box>
+                <AccordionIcon />
+              </AccordionButton>
+              <AccordionPanel pb={4}>
+                <ScholarshipBuilder formData={formData} />
+              </AccordionPanel>
+            </AccordionItem>
+          </Accordion> */}
+          <br />
+          <br />
+          <Button onClick={handleSubmit} colorScheme="teal" mt={4}>
+            Publish Scholarship
           </Button>
         </Box>
+        <br />
+        <br />
+        <br />
+        <br />
+        <br />
+        <br />
       </Container>
     );
   }
@@ -499,16 +512,17 @@ const AdminPage = () => {
         <Heading as="h2" size="xl" mb={4}>
           Login
         </Heading>
-        <FormControl id="password" mb={4}>
-          <FormLabel>Password</FormLabel>
-          <Input
-            style={{ border: "1px solid darkgray" }}
-            type="password"
-            value={password}
-            onChange={handlePasswordChange}
-            placeholder="Enter admin password"
-          />
-        </FormControl>
+        <Input
+          style={{ border: "1px solid black" }}
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={handlePasswordChange}
+          mb={4}
+        />
+        <Button onClick={handleLogin} colorScheme="teal">
+          Login
+        </Button>
       </Box>
     </Container>
   );

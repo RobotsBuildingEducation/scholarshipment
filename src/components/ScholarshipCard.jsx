@@ -21,6 +21,7 @@ import { ExternalLink } from "../elements/ExternalLink";
 import EditScholarshipDrawer from "./EditScholarshipDrawer"; // Import the drawer component
 import { BookMarkIcon } from "../assets/bookmarkIcon";
 import Markdown from "react-markdown";
+import logo_transparent from "../assets/logo_transparent.png";
 
 const ScholarshipCard = ({
   scholarship,
@@ -51,6 +52,7 @@ const ScholarshipCard = ({
       maximumFractionDigits: 0,
     }).format(amount);
   };
+
   return (
     <Box
       borderWidth={1}
@@ -64,6 +66,8 @@ const ScholarshipCard = ({
         boxShadow: "0px 12px 12px -6px rgba(42, 51, 69, 0.04)",
         borderRadius: !isMobile ? 32 : null,
         backgroundColor: "rgba(255,255,255, 0.1)",
+        // border: "1px solid red",
+        border: "1px solid lightgray",
         fontSize: 12,
       }}
     >
@@ -76,14 +80,14 @@ const ScholarshipCard = ({
         </Text>
       </div>
       {images.length > 1 ? (
-        <Carousel data-bs-theme="dark" touch={true} interval={null}>
+        <Carousel touch={true} interval={null}>
           {images?.map((url, index) => (
             <Carousel.Item
               key={index}
               style={{ transition: "0.1s all ease-in-out" }}
             >
               <Image
-                src={url}
+                src={url ? url : logo_transparent}
                 alt={`Scholarship ${index + 1}`}
                 width="100%"
                 height="500px"
@@ -141,10 +145,10 @@ const ScholarshipCard = ({
           <b>Due Date:</b> {scholarship?.dueDate || "-"}
         </Text>
         <Text>
-          <b>Eligibility:</b>{" "}
-          <Markdown style={{ fontSize: 12 }}>
-            {scholarship?.eligibility || "-"}
-          </Markdown>
+          <b>Year:</b> {scholarship?.year || "-"}
+        </Text>
+        <Text>
+          <b>Major:</b> {scholarship?.major || "-"}
         </Text>
 
         <Accordion allowMultiple>
@@ -165,14 +169,14 @@ const ScholarshipCard = ({
                 backgroundColor: "transparent",
               }}
             >
-              <Text>
-                <b>Year:</b> {scholarship?.year || "-"}
-              </Text>
-              <Text>
-                <b>Major:</b> {scholarship?.major || "-"}
-              </Text>
-              <Text>
+              {/* <Text>
                 <b>Ethnicity:</b> {scholarship?.ethnicity || "-"}
+              </Text> */}
+              <Text>
+                <b>Eligibility:</b>{" "}
+                <Markdown style={{ fontSize: 12 }}>
+                  {scholarship?.eligibility || "-"}
+                </Markdown>
               </Text>
               <Text>
                 <b>Details:</b> {scholarship?.details || "-"}
@@ -182,7 +186,6 @@ const ScholarshipCard = ({
         </Accordion>
 
         <br />
-
         <Button
           onClick={() => {
             onSaveScholarship(scholarship);

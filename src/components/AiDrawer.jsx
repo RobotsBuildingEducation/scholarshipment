@@ -25,12 +25,12 @@ const AiDrawer = ({
   existingDraft,
   setExistingDraft,
   original,
+  fireScholarshipResponse,
 }) => {
   const [draftContent, setDraftContent] = useState("");
   const [originalContent, setOriginalContent] = useState("");
 
   useEffect(() => {
-    console.log("hello world");
     if (messages.length > 0) {
       setOriginalContent(messages[messages.length - 1].content);
       setDraftContent(messages[messages.length - 1].content);
@@ -56,9 +56,10 @@ const AiDrawer = ({
         setExistingDraft("");
         onClose();
       }}
-      closeOnOverlayClick={false}
+      closeOnOverlayClick={true}
       blockScrollOnMount={false}
       preserveScrollBarGap={false}
+      returnFocusOnClose={false}
     >
       <DrawerOverlay bg="rgba(0,0,0,0.1)" />
 
@@ -68,6 +69,7 @@ const AiDrawer = ({
 
         <DrawerBody>
           <AI
+            fireScholarshipResponse={fireScholarshipResponse}
             existingDraft={existingDraft}
             messages={messages}
             handleSave={handleSave}
