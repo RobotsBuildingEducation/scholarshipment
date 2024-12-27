@@ -358,6 +358,19 @@ const AdminPage = () => {
               />
             </GridItem>
             <GridItem colSpan={2}>
+              <FormControl id="meta" mb={4}>
+                <FormLabel>Meta</FormLabel>
+                <Textarea
+                  style={{ border: "1px solid black" }}
+                  name="meta"
+                  value={formData.meta}
+                  onChange={handleChange}
+                  placeholder="Add content about the resource to inform the AI when users ask to generate content"
+                />
+              </FormControl>
+            </GridItem>
+
+            <GridItem colSpan={2}>
               <FormLabel htmlFor="tags">Tags</FormLabel>
 
               <VStack align="start">

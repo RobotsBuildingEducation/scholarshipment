@@ -12,6 +12,7 @@ import {
   useBreakpointValue,
   Box,
 } from "@chakra-ui/react";
+import { HiOutlineBookmark, HiOutlineSparkles } from "react-icons/hi2";
 
 const ResponsiveTabs = ({
   viewMode,
@@ -106,10 +107,12 @@ const ResponsiveTabs = ({
       <TabList>
         <Tab onMouseDown={handleViewAllClick}>All</Tab>
         <Tab textAlign="left" onClick={handleViewSavedClick}>
-          Saved
+          <HiOutlineBookmark />
+          &nbsp; Saved
         </Tab>
         <Tab textAlign="left" onClick={handleViewDraftsClick}>
-          Drafts
+          <HiOutlineSparkles />
+          &nbsp;Drafts
         </Tab>
 
         {/* <Tab textAlign="left" onClick={handleMyScholarshipsClick}>

@@ -1,5 +1,8 @@
-import { useToast } from "@chakra-ui/react";
-import React from "react";
+import { Button, IconButton, useToast } from "@chakra-ui/react";
+import React, { useState } from "react";
+import { TbLink } from "react-icons/tb";
+import { TbLinkPlus } from "react-icons/tb";
+import { RxExternalLink } from "react-icons/rx";
 
 export const ExternalSiteIcon = () => {
   return (
@@ -51,23 +54,29 @@ export const ExternalLink = ({
   type,
   scholarshipID,
 }) => {
+  const [copyIsClicked, setCopyIsClicked] = useState(false);
   let toast = useToast();
   const handleClick = (e) => {
     if (type === "copyLink") {
+      // Reset after 3 seconds
+      setCopyIsClicked(true);
       e.preventDefault();
-      navigator.clipboard
-        .writeText("https://scholarshipment.web.app/" + scholarshipID)
-        .then(() => {
-          toast({
-            title: "Link copied",
-            // description: "The link has been copied 📢 ❗❗❗❗❗",
-            status: "info",
-            duration: 2000,
-            isClosable: true,
-            position: "top",
-          });
-        });
+      navigator.clipboard.writeText(
+        "https://scholarshipment.web.app/" + scholarshipID
+      );
+      // .then(() => {
+      //   toast({
+      //     title: "Link copied",
+      //     // description: "The link has been copied 📢 ❗❗❗❗❗",
+      //     status: "info",
+      //     duration: 2000,
+      //     isClosable: true,
+      //     position: "top",
+      //   });
+      // });
     }
+
+    setTimeout(() => setCopyIsClicked(false), 500);
   };
 
   return (
@@ -75,19 +84,28 @@ export const ExternalLink = ({
       href={link}
       target={type === "externalWebsite" ? "_blank" : ""}
       style={{
-        border: `1px solid ${color}`,
+        border: `1px solid ${copyIsClicked ? "purple" : color}`,
         color: "black",
         backgroundColor: color,
         borderRadius: "12px",
-        margin: 8,
+        margin: 6,
         textShadow: "0px 0px 0px black",
         display: "flex",
         width: "fit-content",
         justifyContent: "center",
+        fontSize: 24,
       }}
       onClick={handleClick}
     >
-      {type === "copyLink" ? <LinkIcon /> : <ExternalSiteIcon />}
+      {type === "copyLink" ? (
+        <IconButton variant="transparent" fontSize={24}>
+          {copyIsClicked ? <TbLink color="purple" /> : <TbLink />}
+        </IconButton>
+      ) : (
+        <IconButton variant="transparent" fontSize={24}>
+          <RxExternalLink />
+        </IconButton>
+      )}
       {textDisplay}
     </a>
   );

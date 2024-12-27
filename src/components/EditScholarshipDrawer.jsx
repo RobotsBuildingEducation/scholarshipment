@@ -115,7 +115,7 @@ const EditScholarshipDrawer = ({ isOpen, onClose, scholarship, onUpdate }) => {
           </FormControl>
           <FormControl id="eligibility" mb={4}>
             <FormLabel>Eligibility</FormLabel>
-            <Input
+            <Textarea
               name="eligibility"
               value={formData.eligibility}
               onChange={handleChange}
@@ -135,14 +135,14 @@ const EditScholarshipDrawer = ({ isOpen, onClose, scholarship, onUpdate }) => {
               <NumberInputField />
             </NumberInput>
           </FormControl>
-          <FormControl id="ethnicity" mb={4}>
+          {/* <FormControl id="ethnicity" mb={4}>
             <FormLabel>Ethnicity</FormLabel>
             <Input
               name="ethnicity"
               value={formData.ethnicity}
               onChange={handleChange}
             />
-          </FormControl>
+          </FormControl> */}
           <FormControl id="link" mb={4}>
             <FormLabel>Link</FormLabel>
             <Input

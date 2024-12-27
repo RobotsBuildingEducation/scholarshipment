@@ -14,14 +14,21 @@ import {
   AccordionPanel,
   AccordionIcon,
   useBreakpointValue,
+  IconButton,
 } from "@chakra-ui/react";
 import Carousel from "react-bootstrap/Carousel";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { ExternalLink } from "../elements/ExternalLink";
 import EditScholarshipDrawer from "./EditScholarshipDrawer"; // Import the drawer component
-import { BookMarkIcon } from "../assets/bookmarkIcon";
+// import { BookMarkIcon } from "../assets/bookmarkIcon";
+import { HiOutlineSparkles } from "react-icons/hi2";
+import { HiOutlineBookmark } from "react-icons/hi2";
+
 import Markdown from "react-markdown";
 import logo_transparent from "../assets/logo_transparent.png";
+import ChakraUIRenderer from "chakra-ui-markdown-renderer";
+import { GrFormNext } from "react-icons/gr";
+import { GrFormPrevious } from "react-icons/gr";
 
 const ScholarshipCard = ({
   scholarship,
@@ -80,7 +87,26 @@ const ScholarshipCard = ({
         </Text>
       </div>
       {images.length > 1 ? (
-        <Carousel touch={true} interval={null}>
+        <Carousel
+          touch={true}
+          interval={null}
+          nextIcon={
+            <IconButton
+              boxShadow="0px 0.5px 1px 0px black"
+              borderRadius="40%"
+              variant="outline"
+              icon={<GrFormNext color="black" />}
+            />
+          }
+          prevIcon={
+            <IconButton
+              boxShadow="0px 0.5px 1px 0px black"
+              borderRadius="40%"
+              variant="outline"
+              icon={<GrFormPrevious color="black" />}
+            />
+          }
+        >
           {images?.map((url, index) => (
             <Carousel.Item
               key={index}
@@ -89,9 +115,8 @@ const ScholarshipCard = ({
               <Image
                 src={url ? url : logo_transparent}
                 alt={`Scholarship ${index + 1}`}
-                width="100%"
-                height="500px"
-                objectFit="cover"
+                layout="fill"
+                objectFit="fit"
               />
             </Carousel.Item>
           ))}
@@ -100,9 +125,8 @@ const ScholarshipCard = ({
         <Image
           src={images[0]}
           alt="Scholarship"
-          width="100%"
-          height="300px"
-          objectFit="cover"
+          layout="fill"
+          objectFit="fit"
         />
       )}
       <br />
@@ -173,13 +197,24 @@ const ScholarshipCard = ({
                 <b>Ethnicity:</b> {scholarship?.ethnicity || "-"}
               </Text> */}
               <Text>
-                <b>Eligibility:</b>{" "}
-                <Markdown style={{ fontSize: 12 }}>
-                  {scholarship?.eligibility || "-"}
+                <b>Eligibility</b>{" "}
+                <Markdown
+                  // components={ChakraUIRenderer()}
+                  children={scholarship?.eligibility || "-"}
+                  style={{ fontSize: 12 }}
+                >
+                  {/* {scholarship?.eligibility} */}
                 </Markdown>
               </Text>
               <Text>
-                <b>Details:</b> {scholarship?.details || "-"}
+                <b>Details</b>
+                <Markdown
+                  // components={ChakraUIRenderer()}
+                  children={scholarship?.details || "-"}
+                  style={{ fontSize: 12 }}
+                >
+                  {/* {scholarship?.eligibility} */}
+                </Markdown>
               </Text>
             </AccordionPanel>
           </AccordionItem>
@@ -201,7 +236,8 @@ const ScholarshipCard = ({
           }}
           mt={2}
         >
-          <BookMarkIcon />
+          <HiOutlineBookmark />
+          &nbsp;Save
         </Button>
         <Button
           onClick={() => {
@@ -218,7 +254,8 @@ const ScholarshipCard = ({
           mt={2}
           ml={2}
         >
-          Draft
+          <HiOutlineSparkles />
+          &nbsp;Draft
         </Button>
         {isAdminMode && (
           <>

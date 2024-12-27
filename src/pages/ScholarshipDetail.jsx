@@ -32,14 +32,22 @@ const fluidDrop = keyframes`
   50% { transform: translateY(-30px) scale(0.9); }
 `;
 
-const ScholarshipDetail = () => {
+const ScholarshipDetail = ({
+  didKey,
+  scholarships,
+  handleSaveScholarship,
+  onSend,
+  handleDeleteScholarship,
+  handleUpdateScholarship,
+  isAdminMode,
+}) => {
   const { scholarshipID } = useParams();
   const [scholarship, setScholarship] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [existingDraft, setExistingDraft] = useState(null);
   const [formText, setFormText] = useState("");
-  const [didKey, setDidKey] = useState("");
+  // const [didKey, setDidKey] = useState("");
   const { messages, submitPrompt, resetMessages, abortResponse } =
     useChatCompletion();
   const toast = useToast();
@@ -47,33 +55,33 @@ const ScholarshipDetail = () => {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchDidKey = async () => {
-      const id = localStorage.getItem("uniqueId");
-      if (!id) {
-        try {
-          const { web5 } = await Web5.connect();
-          const newId = web5?.did?.agent?.agentDid;
-          localStorage.setItem("uniqueId", newId);
-          setDidKey(newId);
-          await setDoc(doc(database, "users", newId), {
-            createdAt: new Date().toISOString(),
-          });
-        } catch (error) {
-          console.error("Error connecting to Web5:", error);
-        }
-      } else {
-        setDidKey(id);
-      }
-    };
+  // useEffect(() => {
+  //   const fetchDidKey = async () => {
+  //     const id = localStorage.getItem("uniqueId");
+  //     if (!id) {
+  //       try {
+  //         const { web5 } = await Web5.connect();
+  //         const newId = web5?.did?.agent?.agentDid;
+  //         localStorage.setItem("uniqueId", newId);
+  //         setDidKey(newId);
+  //         await setDoc(doc(database, "users", newId), {
+  //           createdAt: new Date().toISOString(),
+  //         });
+  //       } catch (error) {
+  //         console.error("Error connecting to Web5:", error);
+  //       }
+  //     } else {
+  //       setDidKey(id);
+  //     }
+  //   };
 
-    fetchDidKey();
+  //   fetchDidKey();
 
-    setTimeout(() => {
-      console.log("running y");
-      setLoading(false);
-    }, 1500);
-  }, []);
+  //   setTimeout(() => {
+  //     console.log("running y");
+  //     setLoading(false);
+  //   }, 1500);
+  // }, []);
 
   useEffect(() => {
     if (didKey) {
@@ -98,125 +106,6 @@ const ScholarshipDetail = () => {
     }
   }, [didKey, scholarshipID]);
 
-  const handleSaveScholarship = async (scholarship) => {
-    if (didKey) {
-      try {
-        const scholarshipDocRef = doc(
-          database,
-          `users/${didKey}/savedScholarships`,
-          scholarship.id
-        );
-        await setDoc(scholarshipDocRef, scholarship);
-        toast({
-          title: "Scholarship Saved.",
-          description:
-            "The scholarship has been added to your saved collection.",
-          status: "success",
-          duration: 5000,
-          isClosable: true,
-          position: "top",
-        });
-      } catch (error) {
-        console.log("Error saving scholarship:", error);
-      }
-    } else {
-      console.log("No unique ID found. Cannot save scholarship.");
-    }
-  };
-
-  const onSend = async (scholarship) => {
-    if (didKey) {
-      try {
-        setIsSending(true);
-        const draftDocRef = doc(
-          database,
-          `users/${didKey}/drafts`,
-          scholarship.id
-        );
-        const draftDoc = await getDoc(draftDocRef);
-
-        if (draftDoc?.exists()) {
-          const draftData = draftDoc.data();
-          setExistingDraft(draftData.draftContent);
-          setFormText(draftData.draftContent);
-          setIsSending(false);
-        } else {
-          await submitPrompt([
-            {
-              content: `Draft a sample scholarship essay in clean minimalist markdown without headers. 
-              The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
-                scholarship
-              )}`,
-              role: "user",
-            },
-          ]);
-          console.log("Draft created successfully");
-          setIsSending(false);
-        }
-      } catch (error) {
-        console.log("Error creating draft:", error);
-        setIsSending(false);
-      }
-    } else {
-      console.log("No unique ID found. Cannot create draft.");
-    }
-  };
-
-  const handleOpenSaveModal = (scholarship) => {
-    setIsDrawerOpen(true);
-    setExistingDraft(null); // Ensure existing draft is reset when opening drawer
-    onSend(scholarship);
-  };
-
-  const handleSaveDraft = async (draftContent, originalContent) => {
-    if (scholarship && didKey) {
-      try {
-        const draftDocRef = doc(
-          database,
-          `users/${didKey}/drafts`,
-          scholarship.id
-        );
-        await setDoc(draftDocRef, {
-          scholarshipId: scholarship.id,
-          draftContent,
-          originalContent:
-            messages.length > 0 ? messages[messages.length - 1].content : "",
-        });
-        abortResponse();
-
-        setExistingDraft(draftContent);
-        resetMessages();
-        console.log("Draft saved successfully:", draftContent);
-      } catch (error) {
-        console.log("Error saving draft:", error);
-      }
-    } else {
-      console.log("No scholarship selected or unique ID found.");
-    }
-  };
-
-  const handleFormSubmit = async () => {
-    if (scholarship && didKey) {
-      try {
-        const scholarshipDocRef = doc(
-          database,
-          `users/${didKey}/savedScholarships`,
-          scholarship.id
-        );
-        await setDoc(scholarshipDocRef, {
-          ...scholarship,
-          formText,
-        });
-        console.log("Form submitted and scholarship saved:", formText);
-        setIsDrawerOpen(false);
-      } catch (error) {
-        console.log("Error submitting form:", error);
-      }
-    } else {
-      console.log("No scholarship selected or unique ID found.");
-    }
-  };
-
   if (loading) {
     return (
       <Box
@@ -239,38 +128,15 @@ const ScholarshipDetail = () => {
 
   return (
     <Container p={2}>
-      <Box
-        width={50}
-        as="img"
-        src={logo}
-        borderRadius="34%"
-        style={{ marginTop: 12, cursor: "pointer" }}
-        onClick={() => {
-          navigate(`/`);
-        }}
-      />
-      <br />
       {scholarship ? (
         <>
           <ScholarshipCard
             scholarship={scholarship}
             onSaveScholarship={handleSaveScholarship}
-            onSend={handleOpenSaveModal}
-            onDelete={null} // Assuming delete is not needed in detail view
-            onUpdate={null} // Assuming update is not needed in detail view
-            isAdminMode={false} // Assuming detail view is not in admin mode
-          />
-          <AiDrawer
-            isOpen={isDrawerOpen}
-            onClose={() => setIsDrawerOpen(false)}
-            messages={messages}
-            handleFormSubmit={handleFormSubmit}
-            isSending={isSending}
-            resetMessages={resetMessages}
-            onSaveDraft={handleSaveDraft}
-            existingDraft={existingDraft}
-            setExistingDraft={setExistingDraft}
-            original={null} // Placeholder, adjust as needed
+            onSend={onSend}
+            onDelete={handleDeleteScholarship} // Assuming delete is not needed in detail view
+            onUpdate={handleUpdateScholarship} // Assuming update is not needed in detail view
+            isAdminMode={isAdminMode} // Assuming detail view is not in admin mode
           />
         </>
       ) : (

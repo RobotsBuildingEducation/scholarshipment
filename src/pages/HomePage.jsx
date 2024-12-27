@@ -9,6 +9,9 @@ import { Box, Input, keyframes, Skeleton } from "@chakra-ui/react";
 
 import Feed from "../components/Feed";
 import logo_transparent from "../assets/logo_transparent.png";
+import { useSharedNostr } from "../hooks/useNOSTR";
+import useDidKeyStore from "../hooks/useDidKeyStore";
+import { useParams } from "react-router-dom";
 
 // Define keyframes for animations
 const rotate = keyframes`
@@ -38,11 +41,21 @@ const fluidDrop = keyframes`
 
 const HomePage = ({ isAdminMode = false }) => {
   const [isNewUser, setIsNewUser] = useState(false);
-  const [didKey, setDidKey] = useState("");
+  const { didKey, setDidKey } = useDidKeyStore();
+
   const [loading, setLoading] = useState(true);
   const [isPasscodeCorrect, setIsPasscodeCorrect] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [passcode, setPasscode] = useState("");
+  const {
+    generateNostrKeys,
+    auth,
+    postNostrContent,
+    assignExistingBadgeToNpub,
+  } = useSharedNostr(
+    localStorage.getItem("local_npub"),
+    localStorage.getItem("local_nsec")
+  );
 
   const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD;
 
@@ -64,14 +77,19 @@ const HomePage = ({ isAdminMode = false }) => {
     const id = localStorage.getItem("uniqueId");
     if (!id) {
       try {
-        const didDht = await DidDht.create({ publish: true });
+        console.log("NO ID");
+        // const didDht = await DidDht.create({ publish: true });
 
         // DID and its associated data which can be exported and used in different contexts/apps
         // const portableDid = await didDht.export();
 
         // DID string
-        const did = didDht.uri;
+        // const did = didDht.uri;
+        console.log("NEW KEY...");
+        const newKeys = await generateNostrKeys();
+        // setKeys(newKeys);
 
+        console.log("NEW KEY", newKeys);
         // DID Document
         // console.log("did dht", didDht);
         // console.log("document", didDht.document);
@@ -83,30 +101,32 @@ const HomePage = ({ isAdminMode = false }) => {
         // // const id = "test";
         // console.log("web5", web5);
         // console.log("id", id);
-        let id = did;
+        let id = newKeys.npub;
         localStorage.setItem("uniqueId", id);
         setDidKey(id); // For simplicity, using DID as the key for now.
+        console.log("hello?");
         await setDoc(doc(database, "users", id), {
           createdAt: new Date().toISOString(),
         });
+        console.log("DB", database);
       } catch (error) {
         // localStorage.setItem("uniqueId", "global");
         // await setDoc(doc(database, "users", id), {
         //   createdAt: new Date().toISOString(),
         // });
         // checkUser();
+        console.log("error", error);
+        console.log("error", { error });
       }
     } else {
-      console.log("oh...");
+      console.log("has id...");
       setDidKey(id); // For simplicity, using DID as the key for now.
       const userDocRef = await doc(database, "users", id);
 
       // const userDoc = await getDoc(userDocRef);
     }
-    console.log("running x");
 
     setTimeout(() => {
-      console.log("running y");
       setLoading(false);
     }, 1000);
   };
@@ -119,9 +139,9 @@ const HomePage = ({ isAdminMode = false }) => {
     setPasscode(e.target.value);
   };
 
-  console.log("didKey", didKey);
+  console.log("loading", loading);
 
-  if (loading && !localStorage.getItem("uniqueId"))
+  if (loading)
     return (
       <Box
         height="100vh"

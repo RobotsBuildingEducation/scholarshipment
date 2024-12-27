@@ -12,7 +12,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/edit" element={<HomePage isAdminMode={true} />} />
         <Route path="/admin" element={<AdminPage />} />
-        <Route path="/:scholarshipID" element={<ScholarshipDetail />} />
+        <Route path="/:scholarshipID" element={<HomePage />} />
       </Routes>
     </Router>
   );

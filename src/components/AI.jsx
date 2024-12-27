@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Text, Flex, Button, Textarea } from "@chakra-ui/react";
 import ReactMarkdown from "react-markdown";
 import ChakraUIRenderer from "chakra-ui-markdown-renderer";
+import { CopyIcon } from "@chakra-ui/icons";
 
 const newTheme = {
   p: (props) => {
@@ -30,7 +31,7 @@ const AI = ({
   const handleCopy = (content) => {
     navigator.clipboard.writeText(content);
     setCopiedMessageId(content);
-    setTimeout(() => setCopiedMessageId(null), 2000);
+    setTimeout(() => setCopiedMessageId(null), 300);
   };
 
   const handleEditToggle = (content) => {
@@ -52,6 +53,19 @@ const AI = ({
 
   const renderContent = (content, key) => (
     <Box key={key} bg="#F0F0F0" borderRadius="24px" p="24px" mb={4}>
+      <Box display={"flex"} justifyContent={"flex-end"}>
+        <Button
+          size="sm"
+          onClick={() => handleCopy(content)}
+          backgroundColor={copiedMessageId === content ? "pink.100" : "white"}
+          color={copiedMessageId === content ? "pink.600" : "black"}
+        >
+          <CopyIcon />
+          {/* {copiedMessageId === content ? "Copied" : "Copy"} */}
+        </Button>
+        &nbsp;
+      </Box>
+
       <Flex
         align="center"
         position="sticky"
@@ -61,14 +75,6 @@ const AI = ({
         p={3}
         borderBottom="1px solid #ddd"
       >
-        {isEditing ? null : (
-          <>
-            <Button size="sm" onClick={() => handleCopy(content)}>
-              {copiedMessageId === content ? "Copied" : "Copy"}
-            </Button>
-            &nbsp;
-          </>
-        )}
         <Button size="sm" onClick={() => handleEditToggle(content)}>
           {isEditing ? "View" : "Edit"}
         </Button>
@@ -112,13 +118,13 @@ const AI = ({
         !existingDraft &&
         messages.map((msg, i) => {
           if (msg.role === "assistant") {
-            return renderContent(msg.content, `msg-${i}`);
+            return renderContent(msg.content, `msg-${ms.content}`);
           }
           return null;
         })}
       {fireScholarshipResponse.length > 0 &&
         !existingDraft &&
-        renderContent(fireScholarshipResponse`msg-${i}`)}
+        renderContent(fireScholarshipResponse, `msg-${"x"}`)}
     </>
   );
 };
