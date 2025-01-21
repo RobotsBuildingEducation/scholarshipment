@@ -46,21 +46,13 @@ export const WalletModal = ({ isOpen, onClose }) => {
     <Modal isOpen={isOpen} onClose={onClose}>
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader>Cash App Modal</ModalHeader>
+        <ModalHeader>Bitcoin Deposits</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
           {/* Add your modal content here */}
-          <p>Welcome to the Cash App modal! 🎉</p>
+          {/* <p>Welcome to the Cash App modal! 🎉</p> */}
 
           <>
-            <Text
-              mb={4}
-              textAlign={"left"}
-              background="#7a7a7a"
-              color="white"
-              p={6}
-              borderRadius="12px"
-            ></Text>
             <IdentityCard
               number={
                 // cashuWallet.walletId ||
