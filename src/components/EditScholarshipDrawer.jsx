@@ -20,11 +20,23 @@ import {
   TagLabel,
   TagCloseButton,
   useToast,
+  Box,
+  Image,
 } from "@chakra-ui/react";
+import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { storage } from "../database/setup";
 
 const EditScholarshipDrawer = ({ isOpen, onClose, scholarship, onUpdate }) => {
   const [formData, setFormData] = useState({ ...scholarship });
   const [tagInput, setTagInput] = useState("");
+
+  // Tracks newly selected files (not yet uploaded).
+  const [newFiles, setNewFiles] = useState([]);
+
+  // State for upload progress or errors (optional).
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState("");
+
   const toast = useToast();
 
   const handleChange = (e) => {
@@ -63,18 +75,114 @@ const EditScholarshipDrawer = ({ isOpen, onClose, scholarship, onUpdate }) => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onUpdate(formData);
-    onClose();
-    toast({
-      title: "Scholarship Updated.",
-      description: "The scholarship has been updated successfully.",
-      status: "success",
-      duration: 5000,
-      isClosable: true,
-      position: "top",
+
+    try {
+      // Suppose 'scholarship' object has an 'id' we can use.
+      // If you're updating by doc ID, you can pass it here
+      const scholarshipId = scholarship.id;
+
+      // 1) Upload any new files
+      const newUploadedURLs = await uploadNewFilesToStorage(scholarshipId);
+
+      // 2) Combine existing fileURLs with newly uploaded URLs
+      const updatedFileURLs = [
+        ...(formData.fileURLs || []),
+        ...newUploadedURLs,
+      ];
+
+      // 3) Build updated data
+      const updatedScholarship = {
+        ...formData,
+        fileURLs: updatedFileURLs, // Updated images
+      };
+
+      // 4) Call parent's onUpdate callback
+      onUpdate(updatedScholarship); // e.g. updates Firestore
+      onClose();
+
+      toast({
+        title: "Scholarship Updated.",
+        description: "The scholarship has been updated successfully.",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+        position: "top",
+      });
+
+      // 5) Reset newFiles
+      setNewFiles([]);
+    } catch (err) {
+      console.error("Error updating scholarship:", err);
+      toast({
+        title: "Update Failed",
+        description: err.message || "Something went wrong",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+        position: "top",
+      });
+    }
+  };
+
+  // Handle new file selection
+  const handleFileSelection = (e) => {
+    if (e.target.files) {
+      const chosenFiles = Array.from(e.target.files);
+      setNewFiles(chosenFiles);
+    }
+  };
+
+  // Remove an existing image URL from the scholarship (e.g. user wants to delete it).
+  const handleRemoveExistingImage = (urlToRemove) => {
+    setFormData((prevData) => ({
+      ...prevData,
+      fileURLs: prevData.fileURLs.filter((url) => url !== urlToRemove),
+    }));
+  };
+
+  // Upload newFiles to Firebase and return the array of download URLs
+  const uploadNewFilesToStorage = async (scholarshipId) => {
+    if (!newFiles.length) return [];
+
+    const uploadPromises = newFiles.map((file) => {
+      return new Promise((resolve, reject) => {
+        const storageRef = ref(
+          storage,
+          `uploads/${scholarshipId}/${file.name}`
+        );
+        const uploadTask = uploadBytesResumable(storageRef, file);
+
+        uploadTask.on(
+          "state_changed",
+          (snapshot) => {
+            const progress = Math.round(
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+            );
+            setUploadProgress(progress);
+          },
+          (error) => {
+            setUploadError(error.message);
+            reject(error);
+          },
+          () => {
+            getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+              resolve(downloadURL);
+            });
+          }
+        );
+      });
     });
+
+    try {
+      const urls = await Promise.all(uploadPromises);
+      return urls;
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      setUploadError(error.message);
+      return [];
+    }
   };
 
   return (
@@ -84,7 +192,7 @@ const EditScholarshipDrawer = ({ isOpen, onClose, scholarship, onUpdate }) => {
       onClose={onClose}
       closeOnOverlayClick={false}
       blockScrollOnMount={false}
-      size="md"
+      size="lg"
     >
       <DrawerOverlay />
       <DrawerContent>
@@ -251,7 +359,53 @@ const EditScholarshipDrawer = ({ isOpen, onClose, scholarship, onUpdate }) => {
               Spotlight
             </Checkbox>
           </FormControl>
+
+          {/* Existing images preview and removal */}
+          {formData.fileURLs && formData.fileURLs.length > 0 && (
+            <Box mb={4}>
+              <FormLabel>Existing Images</FormLabel>
+              <HStack wrap="wrap" spacing={4}>
+                {formData.fileURLs.map((imgURL, idx) => (
+                  <Box key={idx} position="relative">
+                    <Image
+                      src={imgURL}
+                      alt="scholarship"
+                      boxSize="100px"
+                      objectFit="cover"
+                      borderRadius="md"
+                      mb={2}
+                    />
+                    <Button
+                      size="xs"
+                      colorScheme="red"
+                      position="absolute"
+                      top="0"
+                      right="0"
+                      onClick={() => handleRemoveExistingImage(imgURL)}
+                    >
+                      X
+                    </Button>
+                  </Box>
+                ))}
+              </HStack>
+            </Box>
+          )}
+
+          {/* Upload new images */}
+          <FormControl id="newImages" mb={4}>
+            <FormLabel>Upload Additional Images</FormLabel>
+            <Input type="file" multiple onChange={handleFileSelection} />
+            {uploadProgress > 0 && (
+              <Box mt={2}>Upload is {uploadProgress}% done</Box>
+            )}
+            {uploadError && (
+              <Box color="red.500" mt={2}>
+                Error: {uploadError}
+              </Box>
+            )}
+          </FormControl>
         </DrawerBody>
+
         <DrawerFooter>
           <Button variant="outline" mr={3} onClick={onClose}>
             Cancel

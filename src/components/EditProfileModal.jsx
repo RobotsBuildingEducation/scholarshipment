@@ -356,7 +356,8 @@ const AccountSwitcherAndProfileEditor = ({
                 <AccordionPanel pb={4}>
                   <VStack spacing={4}>
                     <Text size="sm">
-                      Your secret key is used to log into decentralized apps.
+                      Your secret key is used to log into decentralized apps. It
+                      works just like mailbox, so keep your key somewhere safe!
                       Visit{" "}
                       <Link
                         target="_blank"
@@ -365,7 +366,7 @@ const AccountSwitcherAndProfileEditor = ({
                       >
                         the Other Stuff app store
                       </Link>{" "}
-                      to experience more. Keep your key somewhere safe!
+                      to experience and access more apps with your key.
                     </Text>
                     <Button onClick={handleCopySecretKey}>
                       🔑 Copy Secret Key

@@ -22,14 +22,29 @@ import {
   FormLabel,
   VStack,
   TagCloseButton,
+  Text,
 } from "@chakra-ui/react";
 import ScholarshipBuilder from "../components/ScholarshipBuilder";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../database/setup";
 import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
 import { database } from "../database/setup";
-
+import Papa from "papaparse";
+import { useChatCompletion } from "../hooks/useChatCompletion";
+import useDidKeyStore from "../hooks/useDidKeyStore";
+import { useSharedNostr } from "../hooks/useNOSTR";
+import { useNavigate } from "react-router-dom";
 const AdminPage = () => {
+  const navigate = useNavigate();
+  const { auth, postNostrContent } = useSharedNostr(
+    localStorage.getItem("local_npub"),
+    localStorage.getItem("local_nsec")
+  );
+  const { enableSecretMode, secretMode } = useDidKeyStore();
+  const [secretKeyInput, setSecretKeyInput] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const [formData, setFormData] = useState({
     collectionType: [],
     name: "",
@@ -52,6 +67,14 @@ const AdminPage = () => {
     fileURLs: [], // Holds URLs of uploaded files
   });
 
+  const {
+    messages,
+    loading: isAIParsing,
+    submitPrompt,
+  } = useChatCompletion({
+    response_format: { type: "json_object" },
+  });
+
   const [tagInput, setTagInput] = useState("");
   const [files, setFiles] = useState([]);
   const [progress, setProgress] = useState(0);
@@ -60,15 +83,173 @@ const AdminPage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD;
 
+  const [scholarshipWebsiteText, setScholarshipWebsiteText] = useState("");
+
+  const [excelMode, setExcelMode] = useState(false);
+  const [excelData, setExcelData] = useState([]);
+  const [currentRowIndex, setCurrentRowIndex] = useState(0);
+
   useEffect(() => {
-    const storedPassword = localStorage.getItem("adminPassword");
-    if (storedPassword === correctPassword) {
-      setIsLoggedIn(true);
-    }
+    let getKeys = async () => {
+      let keySet = await auth(localStorage.getItem("local_nsec"));
+
+      console.log("keysetnpub", keySet);
+      if (
+        keySet.user.npub ===
+        // "npub14vskcp90k6gwp6sxjs2jwwqpcmahg6wz3h5vzq0yn6crrsq0utts52axlt"
+        "npub1ae02dvwewx8w0z2sftpcg2ta4xyu6hc00mxuq03x2aclta6et76q90esq2"
+      ) {
+        enableSecretMode();
+      }
+    };
+
+    getKeys();
   }, []);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+
+    console.log("file", file);
+    Papa.parse(file, {
+      header: true,
+      complete: (result) => {
+        console.log("result.data", result.data);
+        setExcelData(result.data);
+        setExcelMode(true);
+        setCurrentRowIndex(0);
+      },
+    });
+  };
+
+  const populateForm = (row) => {
+    const usedColumns = [
+      "Name",
+      "Date Due",
+      "Immigration status/Eligibility Requirements ",
+      "Race/Ethnicity/Gender",
+      "Amount ",
+      "Description",
+      "Open to ",
+      "link",
+    ];
+    const additionalTags = [];
+
+    // Iterate through all columns in the row
+    for (const key in row) {
+      if (row[key] && !usedColumns.includes(key)) {
+        if (key.toLocaleLowerCase().includes("full ride")) {
+          additionalTags.push(`Full ride`);
+        } else if (key.toLocaleLowerCase().includes("rolling")) {
+          additionalTags.push(`Rolling`);
+        } else {
+          let data = row[key].split(", ");
+          data.forEach((word) => {
+            additionalTags.push(word);
+          });
+        }
+      }
+    }
+
+    let convertDateFormat = (dateStr) => {
+      try {
+        // Split the input date string by "/"
+        const [month, day, year] = dateStr.split("/");
+
+        // Check if the input is valid
+        if (
+          !month ||
+          !day ||
+          !year ||
+          isNaN(month) ||
+          isNaN(day) ||
+          isNaN(year)
+        ) {
+          throw new Error("Invalid date format");
+        }
+
+        // Ensure proper formatting with leading zeros
+        const formattedMonth = month.padStart(2, "0");
+        const formattedDay = day.padStart(2, "0");
+
+        // Return the date in YYYY-MM-DD format
+        return `${year}-${formattedMonth}-${formattedDay}`;
+      } catch (error) {
+        return `Error: ${error.message}`;
+      }
+    };
+    setFormData({
+      name: row.Name || "",
+      dueDate: convertDateFormat(row["Date Due"]) || "",
+      year: "", // Adjust as needed
+      eligibility: row["Immigration status/Eligibility Requirements "] || "",
+      major: "", // Not present in the dataset
+      amount: parseFloat(row["Amount "].replace(/[^0-9.-]+/g, "")) || 0,
+      ethnicity: row["Race/Ethnicity/Gender"] || "",
+      link: row.link || "",
+      tags: additionalTags || [], // Adjust as needed
+      details: row.Description || "",
+      meta: "",
+      isHighschool: row["Open to "]?.includes("HS".toLowerCase()) || false,
+      isCollege:
+        row["Open to "]?.includes("College") ||
+        row["Open to "]?.includes("Grad") ||
+        row["Open to "]?.includes("College") ||
+        false,
+      isUnderserved: false, // Adjust as needed
+      isInternational: false, // Adjust as needed
+      isStateOnly: false, // Adjust as needed
+      isSpotlight: false,
+      fileURLs: [],
+    });
+  };
+
+  useEffect(() => {
+    console.log("messages", messages);
+    if (messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    // If streaming done, parse JSON from lastMsg.content
+    if (lastMsg?.meta?.done) {
+      console.log("done");
+      try {
+        console.log("lst", lastMsg);
+
+        const parsed = JSON.parse(lastMsg.content.trim() || "{}");
+        console.log("parsed", parsed);
+        setFormData((prev) => ({
+          ...prev,
+          name: parsed.name || prev.name,
+          dueDate: parsed.dueDate || prev.dueDate,
+          year: parsed.year || prev.year,
+          eligibility: parsed.eligibility || prev.eligibility,
+          major: parsed.major || prev.major,
+          amount: parsed.amount ?? prev.amount,
+          link: parsed.link || prev.link,
+          details: parsed.details || prev.details,
+          meta: parsed.meta || prev.meta,
+          isHighschool: parsed.isHighschool ?? prev.isHighschool,
+          isCollege: parsed.isCollege ?? prev.isCollege,
+          isUnderserved: parsed.isUnderserved ?? prev.isUnderserved,
+          isInternational: parsed.isInternational ?? prev.isInternational,
+          isStateOnly: parsed.isStateOnly ?? prev.isStateOnly,
+          isSpotlight: parsed.isSpotlight ?? prev.isSpotlight,
+          tags: Array.isArray(parsed.tags) ? parsed.tags : prev.tags,
+        }));
+      } catch (err) {
+        console.error("Failed to parse JSON from AI:", err);
+      }
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (excelMode && excelData.length > 0) {
+      populateForm(excelData[currentRowIndex]);
+    }
+  }, [excelMode, currentRowIndex]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    console.log("value", value);
     setFormData((prevData) => ({
       ...prevData,
       [name]: type === "checkbox" ? checked : value,
@@ -176,7 +357,9 @@ const AdminPage = () => {
         }
       );
       const scholarshipId = scholarshipRef.id;
-
+      postNostrContent(
+        `Just published a new scholarship! View it at https://girlsoncampus.app/${scholarshipId} & learn more about the ${formData.name} scholarship due ${formData.dueDate}. \n\n Eligibility: ${formData.eligibility} \n\n #LearnWithNostr`
+      );
       const fileUploadResult = await handleUpload(scholarshipId);
 
       await updateDoc(doc(database, "scholarships", scholarshipId), {
@@ -184,27 +367,34 @@ const AdminPage = () => {
       });
 
       alert("Scholarship published successfully");
-      setFormData({
-        collectionType: [],
-        name: "",
-        dueDate: "",
-        year: "",
-        eligibility: "",
-        major: "",
-        amount: 0,
-        ethnicity: "",
-        link: "",
-        tags: [],
-        details: "",
-        meta: "",
-        isHighschool: false,
-        isCollege: false,
-        isUnderserved: false,
-        isInternational: false,
-        isStateOnly: false,
-        isSpotlight: false,
-        fileURLs: [],
-      });
+      if (excelMode && currentRowIndex < excelData.length - 1) {
+        setCurrentRowIndex((prevIndex) => prevIndex + 1);
+      } else if (excelMode) {
+        alert("All rows processed");
+        setExcelMode(false);
+      } else {
+        setFormData({
+          collectionType: [],
+          name: "",
+          dueDate: "",
+          year: "",
+          eligibility: "",
+          major: "",
+          amount: 0,
+          ethnicity: "",
+          link: "",
+          tags: [],
+          details: "",
+          meta: "",
+          isHighschool: false,
+          isCollege: false,
+          isUnderserved: false,
+          isInternational: false,
+          isStateOnly: false,
+          isSpotlight: false,
+          fileURLs: [],
+        });
+      }
       setFiles([]);
     } catch (error) {
       console.error("Error adding document: ", error);
@@ -220,17 +410,128 @@ const AdminPage = () => {
     setIsLoggedIn(false);
   };
 
-  const handleLogin = () => {
-    if (password === correctPassword) {
-      localStorage.setItem("adminPassword", password);
-      setIsLoggedIn(true);
-    }
+  const handleSecretKeyChange = (e) => {
+    setSecretKeyInput(e.target.value);
   };
 
-  if (isLoggedIn) {
+  const handleLogin = async () => {
+    setIsAuthenticating(true);
+    setErrorMessage(""); // Clear any previous errors
+
+    try {
+      // Assume `auth` is a function to validate the key
+      const result = await auth(secretKeyInput); // Replace with your actual validation logic
+      if (
+        result.user.npub ===
+        "npub1ae02dvwewx8w0z2sftpcg2ta4xyu6hc00mxuq03x2aclta6et76q90esq2"
+      ) {
+        enableSecretMode(); // Enable Secret Mode
+        toast({
+          title: "Secret Mode Enabled",
+          description: "You have successfully entered Secret Mode.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        setErrorMessage("Invalid Secret Key.");
+      }
+    } catch (error) {
+      setErrorMessage("An error occurred. Please try again.");
+      console.error("Secret Key Validation Error:", error);
+    }
+
+    setIsAuthenticating(false);
+  };
+
+  const generateFormDataFromText = () => {
+    const prompt = `
+      You are an assistant for extracting scholarship information from the provided text.
+      The user will supply you with a block of text from a scholarship website.
+      Your job is to return ONLY valid JSON (without extra commentary) that includes the keys and values. Derive the appropriate values.
+      {
+        "name": string,
+        "dueDate": string,
+        "year": string,
+        "eligibility": string,
+        "major": string,
+        "amount": number,
+        "link": string,
+        "tags": string[],
+        "details": string,
+        "meta": string,
+        "isHighschool": boolean,
+        "isCollege": boolean,
+        "isUnderserved": boolean,
+        "isInternational": boolean,
+        "isStateOnly": boolean,
+        "isSpotlight": boolean
+      }
+      The user's text is:
+      """${scholarshipWebsiteText}"""
+    `;
+
+    // We use the hook’s submitPrompt function with an array of messages:
+    submitPrompt([{ role: "user", content: prompt }]);
+  };
+
+  if (secretMode) {
     return (
       <Container>
+        <Box mt={8} mb={8}>
+          <Button boxShadow="0.5px 0.5px 1px 0px" onClick={() => navigate("/")}>
+            Back to app
+          </Button>
+          &nbsp;&nbsp;&nbsp;
+          <Button
+            boxShadow="0.5px 0.5px 1px 0px"
+            onClick={() => navigate("/edit")}
+          >
+            Back to edit mode
+          </Button>
+        </Box>
         <Box>
+          <Heading as="h2" size="xl" mb={4}>
+            Create Scholarship
+            {/* {excelMode ? "Excel Mode: Data Entry" : "Create Scholarship"} */}
+          </Heading>
+
+          <FormControl mb={4}>
+            <FormLabel>Website Scholarship Text (Experimental)</FormLabel>
+            <Text fontSize={"sm"}>
+              Copy and paste the content from the website or platform so AI can
+              fill out the form
+            </Text>
+
+            <Textarea
+              placeholder="Paste scholarship text from the website here..."
+              value={scholarshipWebsiteText}
+              onChange={(e) => setScholarshipWebsiteText(e.target.value)}
+              rows={6}
+              style={{ border: "1px solid black" }}
+            />
+            <Button
+              mt={2}
+              onClick={generateFormDataFromText}
+              isLoading={isAIParsing}
+              colorScheme="purple"
+            >
+              Generate from text
+            </Button>
+          </FormControl>
+          <br />
+          <br />
+          {!excelMode && (
+            <FormControl mb={4}>
+              <FormLabel>Upload CSV for Excel Mode (optional)</FormLabel>
+              <Text fontSize="sm">
+                Excel mode will create a scholarship for each row. You'll need
+                to optionally verify and publish each scholarship after
+                uploading.
+              </Text>
+              <Input type="file" onChange={handleFileUpload} />
+            </FormControl>
+          )}
           <br />
           <br />
           <Heading as="h2" size="xl" mb={4}>
@@ -359,13 +660,13 @@ const AdminPage = () => {
             </GridItem>
             <GridItem colSpan={2}>
               <FormControl id="meta" mb={4}>
-                <FormLabel>Meta</FormLabel>
+                <FormLabel>Meta (optional)</FormLabel>
                 <Textarea
                   style={{ border: "1px solid black" }}
                   name="meta"
                   value={formData.meta}
                   onChange={handleChange}
-                  placeholder="Add content about the resource to inform the AI when users ask to generate content"
+                  placeholder="Copy & content about the resource to inform the AI when users ask to generate content"
                 />
               </FormControl>
             </GridItem>
@@ -505,8 +806,17 @@ const AdminPage = () => {
           </Accordion> */}
           <br />
           <br />
-          <Button onClick={handleSubmit} colorScheme="teal" mt={4}>
+          {/* <Button onClick={handleSubmit} colorScheme="teal" mt={4}>
             Publish Scholarship
+          </Button> */}
+
+          <Button
+            type="submit"
+            colorScheme="teal"
+            mt={4}
+            onClick={handleSubmit}
+          >
+            {excelMode ? "Submit and Next" : "Publish Scholarship"}
           </Button>
         </Box>
         <br />
@@ -523,19 +833,24 @@ const AdminPage = () => {
     <Container>
       <Box>
         <Heading as="h2" size="xl" mb={4}>
-          Login
+          Enter Secret Key
         </Heading>
         <Input
-          style={{ border: "1px solid black" }}
-          placeholder="Password"
+          placeholder="Secret Key"
           type="password"
-          value={password}
-          onChange={handlePasswordChange}
+          value={secretKeyInput}
+          onChange={handleSecretKeyChange}
           mb={4}
+          isDisabled={isAuthenticating}
         />
-        <Button onClick={handleLogin} colorScheme="teal">
+        <Button onClick={handleLogin} isLoading={isAuthenticating}>
           Login
         </Button>
+        {errorMessage && (
+          <Text color="red.500" mt={4}>
+            {errorMessage}
+          </Text>
+        )}
       </Box>
     </Container>
   );

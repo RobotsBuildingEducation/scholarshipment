@@ -62,7 +62,7 @@ export const ExternalLink = ({
       setCopyIsClicked(true);
       e.preventDefault();
       navigator.clipboard.writeText(
-        "https://scholarshipment.web.app/" + scholarshipID
+        "https://girlsoncampus.app/" + scholarshipID
       );
       // .then(() => {
       //   toast({

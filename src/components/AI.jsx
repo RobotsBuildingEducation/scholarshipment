@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Box, Text, Flex, Button, Textarea } from "@chakra-ui/react";
 import ReactMarkdown from "react-markdown";
 import ChakraUIRenderer from "chakra-ui-markdown-renderer";
-import { CopyIcon } from "@chakra-ui/icons";
+import { TbEdit, TbEditOff, TbWriting } from "react-icons/tb";
+import { FaCheck, FaCopy, FaSave } from "react-icons/fa";
+import { RiAiGenerate } from "react-icons/ri";
 
 const newTheme = {
   p: (props) => {
@@ -21,17 +23,25 @@ const AI = ({
   isSending,
   existingDraft,
   original,
-  fireScholarshipResponse,
+  selectedScholarship,
+  onSend,
 }) => {
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [editContent, setEditContent] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (messages && messages?.length > 0) {
+      setEditContent(messages[0].content);
+    }
+  }, [messages]);
 
   const handleCopy = (content) => {
     navigator.clipboard.writeText(content);
     setCopiedMessageId(content);
-    setTimeout(() => setCopiedMessageId(null), 300);
+    setTimeout(() => setCopiedMessageId(null), 600);
   };
 
   const handleEditToggle = (content) => {
@@ -41,7 +51,11 @@ const AI = ({
 
   const handleSaveEdit = () => {
     setIsEditing(false);
+    setIsSaved(true);
     handleSave(editContent);
+    setTimeout(() => {
+      setIsSaved(false);
+    }, 600);
   };
 
   useEffect(() => {
@@ -51,60 +65,85 @@ const AI = ({
     }
   }, [isSending]);
 
-  const renderContent = (content, key) => (
-    <Box key={key} bg="#F0F0F0" borderRadius="24px" p="24px" mb={4}>
-      <Box display={"flex"} justifyContent={"flex-end"}>
-        <Button
-          size="sm"
-          onClick={() => handleCopy(content)}
-          backgroundColor={copiedMessageId === content ? "pink.100" : "white"}
-          color={copiedMessageId === content ? "pink.600" : "black"}
+  const renderContent = (content, key) => {
+    return (
+      <Box key={key} bg="#F0F0F0" borderRadius="24px" p="24px" mb={4}>
+        <Flex
+          align="center"
+          position="sticky"
+          top="-8px"
+          bg="#F0F0F0"
+          zIndex="1"
+          p={3}
+          borderBottom="1px solid #ddd"
         >
-          <CopyIcon />
-          {/* {copiedMessageId === content ? "Copied" : "Copy"} */}
-        </Button>
-        &nbsp;
-      </Box>
+          <Button
+            size="sm"
+            onClick={handleSaveEdit}
+            aria-label="Save changes"
+            mr={2}
+          >
+            {isSaved ? <FaCheck color="green" /> : <FaSave color="#4A5568" />}
+          </Button>
 
-      <Flex
-        align="center"
-        position="sticky"
-        top="-8px"
-        bg="#F0F0F0"
-        zIndex="1"
-        p={3}
-        borderBottom="1px solid #ddd"
-      >
-        <Button size="sm" onClick={() => handleEditToggle(content)}>
-          {isEditing ? "View" : "Edit"}
-        </Button>
-        &nbsp;
-        <Button size="sm" onClick={handleSaveEdit}>
-          Save
-        </Button>
-        {/* {original ? (
+          <Button
+            size="sm"
+            onClick={() => handleEditToggle(content)}
+            aria-label={isEditing ? "View mode" : "Edit mode"}
+            mr={2}
+          >
+            {isEditing ? <TbEditOff /> : <TbEdit color="#4A5568" />}
+          </Button>
+          {!isEditing && (
+            <Button
+              size="sm"
+              onClick={() => handleCopy(content)}
+              aria-label="Copy"
+              mr={2}
+            >
+              {copiedMessageId === content ? (
+                <FaCheck color="green" />
+              ) : (
+                <FaCopy color="#4A5568" />
+              )}
+            </Button>
+          )}
+
+          {!isEditing && (
+            <Button
+              color="#4A5568"
+              size="sm"
+              onClick={() => onSend(selectedScholarship, true)}
+              aria-label="Save changes"
+            >
+              <RiAiGenerate />
+            </Button>
+          )}
+
+          {/* {original ? (
           <Button size="sm" onClick={() => handleEditToggle(original)}>
             Reset
           </Button>
         ) : null} */}
-      </Flex>
-      <br />
-      {isEditing ? (
-        <Textarea
-          mt={2}
-          value={isGenerating ? msg.content : editContent}
-          onChange={(e) => setEditContent(e.target.value)}
-          rows={45}
-        />
-      ) : (
-        <ReactMarkdown
-          components={ChakraUIRenderer(newTheme)}
-          children={content}
-          skipHtml
-        />
-      )}
-    </Box>
-  );
+        </Flex>
+        <br />
+        {isEditing ? (
+          <Textarea
+            mt={2}
+            value={isGenerating ? msg.content : editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            rows={45}
+          />
+        ) : (
+          <ReactMarkdown
+            components={ChakraUIRenderer(newTheme)}
+            children={content}
+            skipHtml
+          />
+        )}
+      </Box>
+    );
+  };
 
   return (
     <>
@@ -113,18 +152,15 @@ const AI = ({
       </Text>
 
       {existingDraft && renderContent(existingDraft, "existing-draft")}
-      {/* {} */}
-      {messages.length > 0 &&
+      {messages &&
+        messages?.length > 0 &&
         !existingDraft &&
         messages.map((msg, i) => {
-          if (msg.role === "assistant") {
-            return renderContent(msg.content, `msg-${ms.content}`);
-          }
-          return null;
+          // if (msg.role === "assistant") {
+          return renderContent(msg.content, `msg-${i}`);
+          // }
+          // return null;
         })}
-      {fireScholarshipResponse.length > 0 &&
-        !existingDraft &&
-        renderContent(fireScholarshipResponse, `msg-${"x"}`)}
     </>
   );
 };

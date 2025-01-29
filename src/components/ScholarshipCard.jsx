@@ -29,6 +29,7 @@ import logo_transparent from "../assets/logo_transparent.png";
 import ChakraUIRenderer from "chakra-ui-markdown-renderer";
 import { GrFormNext } from "react-icons/gr";
 import { GrFormPrevious } from "react-icons/gr";
+import { HiOutlineDocumentRemove } from "react-icons/hi";
 
 const ScholarshipCard = ({
   scholarship,
@@ -37,7 +38,11 @@ const ScholarshipCard = ({
   onDelete,
   onUpdate,
   isAdminMode,
+  viewMode = "all",
+  removeFromSaved,
+  secretMode = false,
 }) => {
+  console.log("secret mode?", secretMode);
   const toast = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const isMobile = useBreakpointValue({ base: true, md: false });
@@ -69,9 +74,10 @@ const ScholarshipCard = ({
       style={{
         // border: "1px solid rgba(201, 201, 201 , 0.6)",
         width: "100%",
-        minHeight: "70vh",
+        minHeight: "100%",
+
         boxShadow: "0px 12px 12px -6px rgba(42, 51, 69, 0.04)",
-        borderRadius: !isMobile ? 32 : null,
+        borderRadius: 32,
         backgroundColor: "rgba(255,255,255, 0.1)",
         // border: "1px solid red",
         border: "1px solid lightgray",
@@ -79,15 +85,16 @@ const ScholarshipCard = ({
       }}
     >
       <div style={{ padding: 18, marginLeft: 12, paddingBottom: 0 }}>
-        <Heading as="h3" fontWeight="bold">
-          {scholarship.name}
-        </Heading>
-        <Text style={{ fontWeight: "bold" }}>
-          {formatAmount(scholarship.amount)}
+        <h3>{scholarship.name}</h3>
+        <Text style={{ fontWeight: "bold" }} fontSize={"lg"}>
+          {scholarship.amount === 0
+            ? "Scholarship amount varies"
+            : formatAmount(scholarship.amount)}
         </Text>
       </div>
       {images.length > 1 ? (
         <Carousel
+          slide={false}
           touch={true}
           interval={null}
           nextIcon={
@@ -112,22 +119,50 @@ const ScholarshipCard = ({
               key={index}
               style={{ transition: "0.1s all ease-in-out" }}
             >
-              <Image
-                src={url ? url : logo_transparent}
-                alt={`Scholarship ${index + 1}`}
-                layout="fill"
-                objectFit="fit"
-              />
+              <div
+                style={{
+                  display: "flex",
+                  width: "100%",
+                  justifyContent: "center",
+                }}
+              >
+                <Image
+                  src={url ? url : logo_transparent}
+                  alt={`Scholarship ${index + 1}`}
+                  layout="fill"
+                  objectFit="fit"
+                />
+              </div>
             </Carousel.Item>
           ))}
         </Carousel>
-      ) : (
-        <Image
-          src={images[0]}
-          alt="Scholarship"
-          layout="fill"
-          objectFit="fit"
-        />
+      ) : images.length === 0 ? null : (
+        // <div
+        //   style={{
+        //     display: "flex",
+        //     justifyContent: "center",
+        //     padding: 100,
+        //   }}
+        // >
+        //   <Image
+        //     textAlign={"center"}
+        //     width="100px"
+        //     src={logo_transparent}
+        //     alt="Scholarship"
+        //     // layout="fill"
+        //     // objectFit="fit"
+        //   />
+        // </div>
+        <div
+          style={{ display: "flex", width: "100%", justifyContent: "center" }}
+        >
+          <Image
+            src={images[0]}
+            alt="Scholarship"
+            layout="fill"
+            objectFit="fit"
+          />
+        </div>
       )}
       <br />
       <Wrap style={{ marginLeft: 12 }}>
@@ -168,12 +203,25 @@ const ScholarshipCard = ({
         <Text>
           <b>Due Date:</b> {scholarship?.dueDate || "-"}
         </Text>
-        <Text>
+
+        {scholarship?.eligibility ? (
+          <Text>
+            <b>Eligibility</b>{" "}
+            <Markdown
+              // components={ChakraUIRenderer()}
+              children={scholarship?.eligibility || "-"}
+              style={{ fontSize: 12 }}
+            >
+              {/* {scholarship?.eligibility} */}
+            </Markdown>
+          </Text>
+        ) : null}
+        {/* <Text>
           <b>Year:</b> {scholarship?.year || "-"}
         </Text>
         <Text>
           <b>Major:</b> {scholarship?.major || "-"}
-        </Text>
+        </Text> */}
 
         <Accordion allowMultiple>
           <AccordionItem>
@@ -196,16 +244,16 @@ const ScholarshipCard = ({
               {/* <Text>
                 <b>Ethnicity:</b> {scholarship?.ethnicity || "-"}
               </Text> */}
-              <Text>
+              {/* <Text>
                 <b>Eligibility</b>{" "}
                 <Markdown
                   // components={ChakraUIRenderer()}
                   children={scholarship?.eligibility || "-"}
                   style={{ fontSize: 12 }}
                 >
-                  {/* {scholarship?.eligibility} */}
+
                 </Markdown>
-              </Text>
+              </Text> */}
               <Text>
                 <b>Details</b>
                 <Markdown
@@ -221,42 +269,112 @@ const ScholarshipCard = ({
         </Accordion>
 
         <br />
-        <Button
-          onClick={() => {
-            onSaveScholarship(scholarship);
-            toast({
-              title: "Scholarship Saved.",
-              description:
-                "The scholarship has been added to your saved collection.",
-              status: "success",
-              duration: 5000,
-              isClosable: true,
-              position: "top",
-            });
-          }}
-          mt={2}
-        >
-          <HiOutlineBookmark />
-          &nbsp;Save
-        </Button>
-        <Button
-          onClick={() => {
-            onSend(scholarship);
-            // toast({
-            //   title: "Draft Created.",
-            //   description: "The draft has been created successfully.",
-            //   status: "info",
-            //   duration: 5000,
-            //   isClosable: true,
-            //   position: "top",
-            // });
-          }}
-          mt={2}
-          ml={2}
-        >
-          <HiOutlineSparkles />
-          &nbsp;Draft
-        </Button>
+        <Box height="100%">
+          {secretMode && (
+            <Button
+              onClick={() => {
+                removeFromSaved(scholarship, "spotlight");
+                toast({
+                  title: "Scholarship Removed.",
+                  description:
+                    "The scholarship has been removed from your collection.",
+                  status: "success",
+                  duration: 1000,
+                  isClosable: true,
+                  position: "top",
+                });
+              }}
+              mt={2}
+              mr={2}
+            >
+              <HiOutlineDocumentRemove />
+              &nbsp;Remove from list
+            </Button>
+          )}
+          {viewMode === "drafts" && (
+            <Button
+              onClick={() => {
+                removeFromSaved(scholarship, "drafts");
+                toast({
+                  title: "Scholarship Removed.",
+                  description:
+                    "The scholarship has been removed from your collection.",
+                  status: "success",
+                  duration: 1000,
+                  isClosable: true,
+                  position: "top",
+                });
+              }}
+              mt={2}
+              mr={2}
+            >
+              <HiOutlineDocumentRemove />
+              &nbsp;Remove from list
+            </Button>
+          )}
+          {viewMode !== "saved" && (
+            <Button
+              onClick={() => {
+                onSaveScholarship(scholarship);
+                toast({
+                  title: "Scholarship Saved.",
+                  description:
+                    "The scholarship has been added to your saved collection.",
+                  status: "success",
+                  duration: 1000,
+                  isClosable: true,
+                  position: "top",
+                });
+              }}
+              mt={2}
+            >
+              <HiOutlineBookmark />
+              &nbsp;Save
+            </Button>
+          )}
+
+          {viewMode === "saved" && (
+            <Button
+              onClick={() => {
+                removeFromSaved(scholarship, "saved");
+                toast({
+                  title: "Scholarship Removed.",
+                  description:
+                    "The scholarship has been removed from your collection.",
+                  status: "success",
+                  duration: 1000,
+                  isClosable: true,
+                  position: "top",
+                });
+              }}
+              mt={2}
+            >
+              <HiOutlineDocumentRemove />
+              &nbsp;Remove from list
+            </Button>
+          )}
+
+          {/* {viewMode !== "drafts" && ( */}
+          <Button
+            onClick={() => {
+              onSend(scholarship);
+              // toast({
+              //   title: "Draft Created.",
+              //   description: "The draft has been created successfully.",
+              //   status: "info",
+              //   duration: 5000,
+              //   isClosable: true,
+              //   position: "top",
+              // });
+            }}
+            mt={2}
+            ml={2}
+          >
+            <HiOutlineSparkles />
+            &nbsp;Draft
+          </Button>
+          {/* )} */}
+        </Box>
         {isAdminMode && (
           <>
             <Button

@@ -1,6 +1,7 @@
 // Feed.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+
 import {
   collection,
   getDocs,
@@ -11,6 +12,8 @@ import {
   getDoc,
   setDoc,
   deleteDoc,
+  serverTimestamp,
+  orderBy,
 } from "firebase/firestore";
 import { database, model } from "../database/setup";
 import {
@@ -64,6 +67,8 @@ import { useSharedNostr } from "../hooks/useNOSTR";
 import useDidKeyStore from "../hooks/useDidKeyStore";
 import { SiCashapp } from "react-icons/si";
 import { WalletModal } from "./WalletModal";
+import { useSimpleGeminiChat } from "../hooks/useGeminiChat";
+import { InstallAppModal } from "./InstallModal";
 
 // import logo_transparent from "../assets/logo_transparent.png";
 
@@ -94,6 +99,12 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
   } = useDisclosure();
 
   const {
+    isOpen: isInstallModalOpen,
+    onOpen: onInstallModalOpen,
+    onClose: onInstallModalClose,
+  } = useDisclosure();
+
+  const {
     isOpen: isConnectDrawerOpen,
     onOpen: onConnectDrawerOpen,
     onClose: onConnectDrawerClose,
@@ -106,6 +117,7 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
   } = useDisclosure();
 
   const isMobile = useBreakpointValue({ base: true, md: false });
+  const [localInput, setLocalInput] = useState("");
 
   const [suggestedScholarships, setSuggestedScholarships] = useState([]);
   const [isFetchingUserData, setIsFetchingUserData] = useState(false);
@@ -123,14 +135,20 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
   const [formText, setFormText] = useState("");
   const [existingDraft, setExistingDraft] = useState(null);
   const [originalDraft, setOriginalDraft] = useState(null);
-  const { messages, submitPrompt, resetMessages, abortResponse } =
-    useChatCompletion();
+  const {
+    messages,
+    submitPrompt,
+    resetMessages,
+    abortPrompt,
+    //  abortResponse
+  } = useSimpleGeminiChat();
   const {
     messages: transformedMessages,
     submitPrompt: transformedSubmitPrompt,
     resetMessages: transformedResetMessages,
     abortResponse: transformAbortResponse,
   } = useChatCompletion({ response_format: { type: "json_object" } });
+
   const [promptData, setPromptData] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [viewMode, setViewMode] = useState("spotlight"); // Set initial view mode to spotlight
@@ -163,14 +181,12 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
 
     for await (const chunk of result.stream) {
       const chunkText = chunk.text();
-      console.log(chunkText);
+
       setFireScholarshipResponse((prevText) => prevText + chunkText);
     }
-
-    console.log("aggregated response: ", await result.response);
   };
 
-  const onSend = async (scholarship) => {
+  const onSend = async (scholarship, generating = false) => {
     setIsSending(true);
     setSelectedScholarship(scholarship);
     handleOpenSaveModal(scholarship);
@@ -183,31 +199,28 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
 
     const userData = userDoc.data();
 
-    if (draftDoc?.exists()) {
+    if (draftDoc?.exists() && !generating) {
       const draftData = draftDoc.data();
       setExistingDraft(draftData.draftContent);
       setOriginalDraft(draftData?.originalContent);
       setFormText(draftData.draftContent);
+      // setFireScholarshipResponse(draftData);
       setIsSending(false);
     } else {
-      // await submitPrompt([
-      //   {
-      //     content: `Draft a high quality scholarship essay in clean minimalist markdown without headers.
+      resetMessages();
+      setExistingDraft("");
+      setOriginalDraft("");
+      setFormText("");
+      const prompt = `Draft a high quality scholarship essay in clean minimalist markdown without headers. The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
+        scholarship
+      )} Additionally, the user may have provided information about them personally, to make the essay draft more realistic. ${JSON.stringify(
+        userData
+      )}`;
+      await submitPrompt(prompt);
 
-      //     The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
-      //       scholarship
-      //     )}
+      // setFireScholarshipResponse("");
 
-      //     Additionally, the user may have provided information about them personally, to make the essay draft more realistic. ${JSON.stringify(
-      //       userData
-      //     )}
-      //     `,
-
-      //     role: "user",
-      //   },
-      // ]);
-
-      fetchGoogleAI(scholarship, userData);
+      // fetchGoogleAI(scholarship, userData);
       setPromptData("");
 
       setIsSending(false);
@@ -266,10 +279,10 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
     setIsRenderingSpotlight(false);
     if (didKey) {
       try {
-        const draftsQuery = query(
-          collection(database, `users/${didKey}/drafts`)
-        );
-        const querySnapshot = await getDocs(draftsQuery);
+        const savedRef = collection(database, `users/${didKey}/drafts`);
+        const savedQuery = query(savedRef, orderBy("dateSaved", "desc"));
+
+        const querySnapshot = await getDocs(savedQuery);
         const loadedDrafts = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -288,12 +301,15 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
     if (didKey) {
       try {
         console.log("DID KEY?", didKey);
-        const savedQuery = query(
-          collection(database, `users/${didKey}/savedScholarships`)
+        const savedRef = collection(
+          database,
+          `users/${didKey}/savedScholarships`
         );
+
+        const savedQuery = query(savedRef, orderBy("dateSaved", "desc"));
+
         const querySnapshot = await getDocs(savedQuery);
         const loadedSavedScholarships = querySnapshot.docs.map((doc) => {
-          console.log("doc...", doc);
           return {
             id: doc.id,
             ...doc.data(),
@@ -312,7 +328,6 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
     let getKeys = async () => {
       let keySet = await auth(localStorage.getItem("local_nsec"));
 
-      console.log("keysetnpub", keySet);
       if (
         keySet.user.npub ===
         // "npub14vskcp90k6gwp6sxjs2jwwqpcmahg6wz3h5vzq0yn6crrsq0utts52axlt"
@@ -331,18 +346,15 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
     loadScholarships(); // Don’t pass true or false here
   }, [didKey]);
 
+  // useEffect(() => {
+  //   if (viewMode === "spotlight") {
+  //     loadScholarships();
+  //   }
+  // }, [viewMode]);
+
   useEffect(() => {
     if (transformedMessages.length > 0) {
       if (transformedMessages[transformedMessages.length - 1].meta.done) {
-        console.log(
-          "final message",
-          JSON.stringify(
-            transformedMessages[transformedMessages.length - 1].content,
-            null,
-            2
-          )
-        );
-
         const recommendedIds = JSON.parse(
           transformedMessages[transformedMessages.length - 1].content
         ).response.suggested;
@@ -360,17 +372,16 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
   }, [transformedMessages]);
 
   useEffect(() => {
-    console.log("query...", searchQuery);
     // If we have no scholarships loaded yet, just skip
     // if (!scholarships || scholarships.length === 0) return;
-    console.log("cont...");
+
     if (searchQuery.trim() && searchQuery.length > 0) {
-      console.log("THE QUERY IS EMPTY", searchQuery === "");
       // 1) Global search: search across ALL scholarships, ignoring viewMode & filters
       const lowerQuery = searchQuery.toLowerCase();
-      const results = allScholarships.filter((sch) =>
-        JSON.stringify(sch).toLowerCase().includes(lowerQuery)
-      );
+      const results = allScholarships.filter((sch) => {
+        return JSON.stringify(sch).toLowerCase().includes(lowerQuery);
+      });
+
       setFilteredScholarships(results);
     } else {
       // 2) NO search query? Fallback to your normal display logic
@@ -396,35 +407,41 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
   }, [searchQuery]);
   // Always load all scholarships in one go
   const loadScholarships = async (view = "spotlight") => {
+    // window.alert("ok");
+
     setViewMode(view);
     if (view !== "spotlight") {
       setIsRenderingSpotlight(false);
     }
-    try {
-      const q = query(collection(database, "scholarships"));
-      const querySnapshot = await getDocs(q);
-      const loadedScholarships = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
 
-      // Store them in allScholarships
-      setAllScholarships(loadedScholarships);
+    if (allScholarships.length < 1) {
+      try {
+        const q = query(collection(database, "scholarships"));
+        const querySnapshot = await getDocs(q);
+        const loadedScholarships = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
 
-      // By default, maybe show "spotlight" if your initial viewMode is "spotlight"
-      // but you *still* keep the entire dataset in `allScholarships`
-      console.log("VIEW MODE?", viewMode);
-      if (viewMode === "spotlight") {
-        console.log("Its spot");
-        console.log("LOADED SCHOLARSHIPS", loadedScholarships);
-        setFilteredScholarships(
-          loadedScholarships.filter((sch) => sch.isSpotlight)
-        );
-      } else {
-        setFilteredScholarships(loadedScholarships);
+        // Store them in allScholarships
+        setAllScholarships(loadedScholarships);
+
+        // By default, maybe show "spotlight" if your initial viewMode is "spotlight"
+        // but you *still* keep the entire dataset in `allScholarships`
+
+        if (view === "spotlight") {
+          setFilteredScholarships(
+            loadedScholarships.filter((sch) => sch.isSpotlight)
+          );
+        } else {
+          setFilteredScholarships(loadedScholarships);
+        }
+      } catch (error) {
+        console.log("error loading scholarships", error);
       }
-    } catch (error) {
-      console.log("error loading scholarships", error);
+    } else {
+      // setAllScholarships(allScholarships)
+      setFilteredScholarships(allScholarships);
     }
   };
 
@@ -456,7 +473,6 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
       );
     });
 
-    console.log("filtered...");
     setFilteredScholarships(filtered);
   };
 
@@ -497,7 +513,11 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
           `users/${didKey}/savedScholarships`,
           scholarship.id
         );
-        await setDoc(scholarshipDocRef, scholarship);
+
+        await setDoc(scholarshipDocRef, {
+          ...scholarship,
+          dateSaved: serverTimestamp(), // Store a server-generated timestamp
+        });
         console.log("Scholarship saved successfully!");
       } catch (error) {
         console.log("Error saving scholarship:", error);
@@ -517,6 +537,62 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
       console.log("Scholarship deleted successfully!");
     } catch (error) {
       console.log("Error deleting scholarship:", error);
+    }
+  };
+
+  const removeFromSaved = async (scholarship, collectionType) => {
+    let list =
+      collectionType === "saved"
+        ? "savedScholarships"
+        : collectionType === "drafts"
+        ? "drafts"
+        : "spotlight";
+    if (list === "saved" || list === "drafts") {
+      try {
+        await deleteDoc(
+          doc(database, `users/${didKey}/${list}`, scholarship.id)
+        );
+
+        // Update state after removal
+        if (list === "savedScholarships") {
+          setSavedScholarships((prev) =>
+            prev.filter((sch) => sch.id !== scholarship.id)
+          );
+          setFilteredScholarships((prev) =>
+            prev.filter((sch) => sch.id !== scholarship.id)
+          );
+        } else if (list === "drafts") {
+          setDrafts((prev) => prev.filter((sch) => sch.id !== scholarship.id));
+          setFilteredScholarships((prev) =>
+            prev.filter((sch) => sch.id !== scholarship.id)
+          );
+        }
+
+        console.log("Scholarship removed from saved collection!");
+      } catch (error) {
+        console.log("Error removing scholarship from saved:", error);
+      }
+    } else {
+      try {
+        const docRef = doc(database, "scholarships", scholarship.id);
+        await updateDoc(docRef, { isSpotlight: false });
+
+        // Optionally update your local states so the UI
+        // doesn't still show it as spotlight
+        setAllScholarships((prev) =>
+          prev.map((sch) =>
+            sch.id === scholarship.id ? { ...sch, isSpotlight: false } : sch
+          )
+        );
+        // If you prefer to remove it entirely from the filtered list:
+        setFilteredScholarships((prev) =>
+          prev.filter((sch) => sch.id !== scholarship.id)
+        );
+
+        console.log("Scholarship removed from spotlight!");
+      } catch (error) {
+        console.log("Error removing scholarship from spotlight:", error);
+      }
     }
   };
 
@@ -555,31 +631,33 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
           `users/${didKey}/drafts`,
           selectedScholarship.id
         );
+
         await setDoc(draftDocRef, {
+          dateSaved: serverTimestamp(), // Store a server-generated timestamp
           scholarshipId: selectedScholarship.id,
-          draftContent,
           originalContent:
             messages.length > 0 ? messages[messages.length - 1].content : "",
           ...selectedScholarship,
+          draftContent: draftContent,
         });
-        abortResponse();
+        // abortResponse();
 
         setOriginalDraft(
           messages.length > 0 ? messages[messages.length - 1].content : ""
         );
         setExistingDraft(draftContent);
-        resetMessages();
+        // resetMessages();
 
-        toast({
-          title: "Draft Saved.",
-          description:
-            "The scholarship draft has been added to your drafts collection.",
-          status: "success",
-          duration: 3000,
-          isClosable: true,
-          position: "top",
-          zIndex: 100000,
-        });
+        // toast({
+        //   title: "Draft Saved.",
+        //   description:
+        //     "The scholarship draft has been added to your drafts collection.",
+        //   status: "success",
+        //   duration: 3000,
+        //   isClosable: true,
+        //   position: "top",
+        //   zIndex: 100000,
+        // });
       } catch (error) {
         console.log("Error saving draft:", error);
       }
@@ -611,16 +689,30 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
   };
 
   const handleViewDraftsClick = () => {
+    setSearchQuery("");
+    navigate("/");
+
     fetchDrafts("drafts");
   };
 
   const handleViewSavedClick = async () => {
+    setSearchQuery("");
+    navigate("/");
     fetchSavedScholarships("saved");
   };
 
-  const handleViewAllClick = async () => {
+  const handleViewAllClick = () => {
+    setSearchQuery("");
+    navigate("/");
     setViewMode("all");
-    loadScholarships("all");
+
+    setIsRenderingSpotlight(false);
+    if (allScholarships.length < 1) {
+      console.log("running xyz......");
+      loadScholarships("all");
+    } else {
+      // setFilteredScholarships(allScholarships);
+    }
   };
 
   const handleRecommendedClick = async () => {
@@ -658,8 +750,6 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
   // alert(!(viewMode === "spotlight"));
   // alert(params.scholarshipID && viewMode !== "spotlight");
   // alert(params.scholarshipID && viewMode === "spotlight");
-
-  console.log("seecert mode", secretMode);
 
   let feedRender = null;
   if (isFetchingUserData) {
@@ -747,6 +837,7 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
       </>
     );
   } else {
+    console.log("secret mode", secretMode);
     feedRender = (
       <>
         {params.scholarshipID && viewMode === "spotlight" ? (
@@ -762,14 +853,15 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
         ) : isRenderingSpotlight ? (
           <div
             style={{
-              paddingTop: 16,
-              paddingBottom: 16,
-              marginTop: isMobile ? null : "-52px",
+              padding: 16,
+
+              marginTop: isMobile ? null : "-0px",
             }}
           >
             <Heading
               as="h3"
               size="lg"
+              mb={"-8"}
               // border="1px solid red"
             >
               Spotlight
@@ -781,6 +873,8 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
               onDelete={handleDeleteScholarship}
               onUpdate={handleUpdateScholarship}
               isAdminMode={isAdminMode}
+              removeFromSaved={removeFromSaved}
+              secretMode={secretMode}
             />
           </div>
         ) : null}
@@ -792,32 +886,45 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
           )} */}
           {viewMode === "all" && (
             <ScholarshipList
-              scholarships={filteredScholarships}
+              scholarships={
+                searchQuery.length > 0 ? filteredScholarships : allScholarships
+              }
               onSaveScholarship={handleSaveScholarship}
               onSend={onSend}
               onDelete={handleDeleteScholarship}
               onUpdate={handleUpdateScholarship}
               isAdminMode={isAdminMode}
+              removeFromSaved={removeFromSaved}
             />
           )}
           {viewMode === "saved" && (
             <ScholarshipList
-              scholarships={savedScholarships}
+              scholarships={
+                searchQuery.length > 0
+                  ? filteredScholarships
+                  : savedScholarships
+              }
               onSaveScholarship={handleSaveScholarship}
               onSend={onSend}
               onDelete={handleDeleteScholarship}
               onUpdate={handleUpdateScholarship}
               isAdminMode={isAdminMode}
+              viewMode={viewMode}
+              removeFromSaved={removeFromSaved}
             />
           )}
           {viewMode === "drafts" && (
             <ScholarshipList
-              scholarships={drafts}
+              scholarships={
+                searchQuery.length > 0 ? filteredScholarships : drafts
+              }
               onSaveScholarship={handleSaveScholarship}
               onSend={onSend}
               onDelete={handleDeleteScholarship}
               onUpdate={handleUpdateScholarship}
               isAdminMode={isAdminMode}
+              viewMode={viewMode}
+              removeFromSaved={removeFromSaved}
             />
           )}
 
@@ -829,12 +936,37 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
               onDelete={handleDeleteScholarship}
               onUpdate={handleUpdateScholarship}
               isAdminMode={isAdminMode}
+              removeFromSaved={removeFromSaved}
             />
           )}
         </>
       </>
     );
   }
+
+  const debouncedOnChange = useMemo(() => {
+    return debounce((value) => setSearchQuery(value), 300);
+  }, []);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearchQuery(localInput);
+    }, 300);
+
+    // Cancel the timeout if localInput changes again before 300ms
+    return () => clearTimeout(handler);
+  }, [localInput]);
+
+  const handleInputChange = (e) => {
+    // Update input immediately
+    setLocalInput(e.target.value);
+  };
+
+  useEffect(() => {
+    if (!isAiDrawerOpen) {
+      resetMessages();
+    }
+  }, [isAiDrawerOpen]);
 
   return (
     <Container
@@ -852,16 +984,19 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
           // justifyContent: "flex-end",
 
           padding: 8,
+          paddingBottom: 0,
           // position: "fixed",
 
           width: "100%",
           maxWidth: 606,
 
           borderRadius: 4,
+          borderBottomRightRadius: 0,
+          borderBottomLeftRadius: 0,
           top: 0,
 
           position: "fixed",
-          backgroundColor: "pink",
+          background: "#faf2f4",
           zIndex: 2,
         }}
       >
@@ -881,6 +1016,8 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
             borderRadius="34%"
             style={{ cursor: "pointer" }}
             onClick={() => {
+              setViewMode("spotlight");
+              setIsRenderingSpotlight(true);
               navigate(`/`);
             }}
           />
@@ -907,34 +1044,26 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
               style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
             />
           </Button>
-          &nbsp;&nbsp;
+          {/* &nbsp;&nbsp;
           {secretMode ? (
-            <Button
-              onClick={onWalletOpen}
-              boxShadow="0.5px 0.5px 1px 0px black"
-            >
-              <SiCashapp
-                style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
-              />
-            </Button>
-          ) : null}
+  
+          ) : null} */}
           <Box flex="1" ml={4} width="100%">
             <input
               type="text"
-              placeholder={
-                !(viewMode === "spotlight" || viewMode === "all")
-                  ? "Search disabled"
-                  : "Search scholarships..."
-              }
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={"Search scholarship data"}
+              // value={searchQuery}
+              // onChange={(event) => debouncedOnChange(event.target.value)}
+
+              value={localInput}
+              onChange={handleInputChange}
               style={{
                 width: "100%",
                 padding: 8,
                 borderRadius: 6,
                 border: "1px solid #ccc",
               }}
-              disabled={!(viewMode === "spotlight" || viewMode === "all")}
+              // disabled={!(viewMode === "spotlight" || viewMode === "all")}
             />
           </Box>
         </Box>
@@ -971,24 +1100,38 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
         />
       ) : null}
 
-      <AiDrawer
-        setExistingDraft={setExistingDraft}
-        existingDraft={existingDraft}
-        isOpen={isAiDrawerOpen}
-        onClose={onAiDrawerClose}
-        messages={messages}
-        handleFormSubmit={handleFormSubmit}
-        resetMessages={resetMessages}
-        onSaveDraft={handleSaveDraft}
-        isSending={isSending}
-        original={originalDraft}
-        fireScholarshipResponse={fireScholarshipResponse}
-      />
+      {isAiDrawerOpen ? (
+        <AiDrawer
+          abortPrompt={abortPrompt}
+          setExistingDraft={setExistingDraft}
+          existingDraft={existingDraft}
+          isOpen={isAiDrawerOpen}
+          onClose={onAiDrawerClose}
+          messages={messages}
+          handleFormSubmit={handleFormSubmit}
+          resetMessages={resetMessages}
+          onSaveDraft={handleSaveDraft}
+          isSending={isSending}
+          original={originalDraft}
+          onSend={onSend}
+          selectedScholarship={selectedScholarship}
+          // fireScholarshipResponse={fireScholarshipResponse}
+          // setFireScholarshipResponse={setFireScholarshipResponse}
+        />
+      ) : null}
+
+      {isInstallModalOpen ? (
+        <InstallAppModal
+          isOpen={isInstallModalOpen}
+          onClose={onInstallModalClose}
+        />
+      ) : null}
 
       <Drawer
         isOpen={isConnectDrawerOpen}
         placement="right"
         onClose={onConnectDrawerClose}
+        blockScrollOnMount={false}
       >
         {/* <DrawerOverlay /> */}
         <DrawerContent>
@@ -1006,6 +1149,33 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
                 <Image src={logo_transparent} height="18px" objectFit="cover" />
                 &nbsp;Connect
               </Link>
+
+              <Link onClick={onInstallModalOpen}>Install App</Link>
+
+              {secretMode ? (
+                <>
+                  <br />
+                  <h4>Your Eyes Only</h4>
+
+                  <Link onClick={() => navigate("/")}>User Mode</Link>
+                  <Link onClick={() => navigate("/edit")}>Edit Mode</Link>
+
+                  <Link onClick={() => navigate("/admin")}>Admin Mode</Link>
+
+                  <Button
+                    onClick={onWalletOpen}
+                    boxShadow="0.5px 0.5px 1px 0px black"
+                  >
+                    <SiCashapp
+                      style={{
+                        color: "#C95F8F",
+                        textShadow: "3px 3px 3px black",
+                      }}
+                    />{" "}
+                    &nbsp; Wallet
+                  </Button>
+                </>
+              ) : null}
               {/* <Button onClick={() => console.log("Link 2 Selected")}>
                 Connect Link 2
               </Button>

@@ -25,13 +25,15 @@ const AiDrawer = ({
   existingDraft,
   setExistingDraft,
   original,
-  fireScholarshipResponse,
+  onSend,
+  selectedScholarship,
+  abortPrompt,
 }) => {
   const [draftContent, setDraftContent] = useState("");
   const [originalContent, setOriginalContent] = useState("");
 
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages && messages?.length > 0) {
       setOriginalContent(messages[messages.length - 1].content);
       setDraftContent(messages[messages.length - 1].content);
     }
@@ -46,12 +48,18 @@ const AiDrawer = ({
 
     setExistingDraft(content);
   };
+  // useEffect(() => {
+  //   // if (!isOpen) {
+  //   resetMessages();
+  //   // }
+  // }, [onClose]);
 
   return (
     <Drawer
       isOpen={isOpen}
       placement="right"
       onClose={() => {
+        abortPrompt();
         resetMessages();
         setExistingDraft("");
         onClose();
@@ -69,18 +77,20 @@ const AiDrawer = ({
 
         <DrawerBody>
           <AI
-            fireScholarshipResponse={fireScholarshipResponse}
+            onSend={onSend}
             existingDraft={existingDraft}
             messages={messages}
             handleSave={handleSave}
             isSending={isSending}
             original={original}
+            selectedScholarship={selectedScholarship}
           />
         </DrawerBody>
 
         <DrawerFooter>
           <Button
             onClick={() => {
+              abortPrompt();
               resetMessages();
               setExistingDraft("");
               onClose();

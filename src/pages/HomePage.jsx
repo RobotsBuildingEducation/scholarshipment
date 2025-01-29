@@ -12,6 +12,7 @@ import logo_transparent from "../assets/logo_transparent.png";
 import { useSharedNostr } from "../hooks/useNOSTR";
 import useDidKeyStore from "../hooks/useDidKeyStore";
 import { useParams } from "react-router-dom";
+import { debounce } from "lodash";
 
 // Define keyframes for animations
 const rotate = keyframes`
@@ -41,7 +42,7 @@ const fluidDrop = keyframes`
 
 const HomePage = ({ isAdminMode = false }) => {
   const [isNewUser, setIsNewUser] = useState(false);
-  const { didKey, setDidKey } = useDidKeyStore();
+  const { didKey, setDidKey, enableSecretMode, secretMode } = useDidKeyStore();
 
   const [loading, setLoading] = useState(true);
   const [isPasscodeCorrect, setIsPasscodeCorrect] = useState(false);
@@ -60,11 +61,44 @@ const HomePage = ({ isAdminMode = false }) => {
   const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD;
 
   useEffect(() => {
-    if (passcode === correctPassword) {
-      localStorage.setItem("adminPassword", passcode);
-      setIsLoggedIn(true);
+    let getKeys = async () => {
+      let keySet = await auth(passcode);
+      console.log("keyset", keySet);
+
+      if (
+        keySet.user.npub ===
+        // "npub14vskcp90k6gwp6sxjs2jwwqpcmahg6wz3h5vzq0yn6crrsq0utts52axlt"
+        "npub1ae02dvwewx8w0z2sftpcg2ta4xyu6hc00mxuq03x2aclta6et76q90esq2"
+      ) {
+        enableSecretMode();
+      }
+    };
+
+    const debouncedGetKeys = debounce(getKeys, 1000);
+
+    if (passcode) {
+      debouncedGetKeys(); // Call the debounced function
     }
+    return () => {
+      debouncedGetKeys.cancel();
+    };
   }, [passcode]);
+
+  useEffect(() => {
+    let getKeys = async () => {
+      let keySet = await auth(localStorage.getItem("local_nsec"));
+
+      if (
+        keySet.user.npub ===
+        // "npub14vskcp90k6gwp6sxjs2jwwqpcmahg6wz3h5vzq0yn6crrsq0utts52axlt"
+        "npub1ae02dvwewx8w0z2sftpcg2ta4xyu6hc00mxuq03x2aclta6et76q90esq2"
+      ) {
+        enableSecretMode();
+      }
+    };
+
+    getKeys();
+  }, []);
 
   const checkUser = async () => {
     if (isAdminMode) {
@@ -139,8 +173,6 @@ const HomePage = ({ isAdminMode = false }) => {
     setPasscode(e.target.value);
   };
 
-  console.log("loading", loading);
-
   if (loading)
     return (
       <Box
@@ -163,7 +195,7 @@ const HomePage = ({ isAdminMode = false }) => {
       </Box>
     );
 
-  if (isAdminMode && !isLoggedIn)
+  if (!secretMode && isAdminMode)
     return (
       <Box
         height="100vh"

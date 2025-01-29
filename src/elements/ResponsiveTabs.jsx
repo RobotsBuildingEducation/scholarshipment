@@ -85,27 +85,45 @@ const ResponsiveTabs = ({
   //     </Accordion>
   //   );
   // } else {
+  let idx = -1;
+  if (viewMode === "all") {
+    idx = 0;
+  } else if (viewMode === "saved") {
+    idx = 1;
+  } else if (viewMode === "drafts") {
+    idx = 2;
+  }
   return (
     <Tabs
       isFitted
       orientation={tabOrientation}
-      index={viewMode === "spotlight" ? -1 : undefined} // No tab selected for spotlight
-      onChange={(index) => {
-        const modes = [
-          "all",
-          "drafts",
-          "saved",
-          // "preferences",
-          // "recommended",
-        ];
-        setViewMode(modes[index]);
-      }}
+      index={idx} // No tab selected for spotlight
+      // onChange={(index) => {
+      //   const modes = [
+      //     "all",
+      //     "drafts",
+      //     "saved",
+      //     // "preferences",
+      //     // "recommended",
+      //   ];
+      //   setViewMode(modes[index]);
+      // }}
       variant="soft-rounded"
       colorScheme="blue"
       style={{ marginBottom: 48 }}
     >
-      <TabList>
-        <Tab onMouseDown={handleViewAllClick}>All</Tab>
+      <TabList
+        position="fixed"
+        background={"#faf2f4"}
+        opacity="1"
+        zIndex="10"
+        maxWidth="606px"
+        width="100%"
+        marginTop="-18px"
+        padding="4px"
+        borderBottomRadius={"6px"}
+      >
+        <Tab onClick={handleViewAllClick}>All</Tab>
         <Tab textAlign="left" onClick={handleViewSavedClick}>
           <HiOutlineBookmark />
           &nbsp; Saved
