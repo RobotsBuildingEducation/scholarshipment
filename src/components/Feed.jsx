@@ -170,11 +170,50 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
     // Provide a prompt that contains text
     // const prompt = "Write a story about a magic backpack.";
 
-    const prompt = `Draft a high quality scholarship essay in clean minimalist markdown without headers. The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
+    const prompt = `Draft a high quality scholarship essay in clean minimalist markdown without headers. This scholarship should be  professional and should be certain to avoid poetric or generic expressions about identity and perspective. The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
       scholarship
-    )} Additionally, the user may have provided information about them personally, to make the essay draft more realistic. ${JSON.stringify(
+    )} Additionally, the user may have provided information about them personally, ${JSON.stringify(
       userData
-    )}`;
+    )}
+    
+    Reflect deeply on your personal background, goals, and contributions to your community. In your response, aim to weave a compelling story that highlights the following elements:
+
+1. Personal Story and Motivation
+- Share formative childhood or life experiences that shaped your ambition and character.
+- Explain why you chose your major or future career path and how it connects to your personal journey.
+
+2. Overcoming Challenges
+- Describe any adversity—financial, cultural, educational, or personal—you’ve faced, and explain how these obstacles influenced your growth.
+- Illustrate the steps you’ve taken to address or triumph over these barriers.
+
+3. Leadership and Initiative
+- Highlight moments where you took the lead, whether at school, in clubs, in the community, or at work.
+- Emphasize how you brought people together, organized events, or created new solutions to support others.
+
+4. Community Engagement and Service
+- Share the ways you give back—volunteering, mentorship, activism, or any initiatives you launched.
+- Discuss the impact of these efforts and how they align with your core values and future ambitions.
+
+5. Academic and Professional Development
+- Talk about significant achievements (awards, internships, fellowships, clubs) and what you learned from those experiences.
+- If applicable, detail your plans for further certifications or advanced degrees and why they are essential to your goals.
+
+6. Vision for the Future
+- Describe your long-term aspirations, both professionally and personally.
+- Explain how you plan to use your skills, education, and network to create positive change in your field or community.
+
+7. Financial Need and Determination
+- If relevant, address any financial challenges you face.
+- Convey how this scholarship support will help you focus on academics, service, and leadership, ultimately boosting your ability to give back.
+
+8. Guidelines
+Provide specific examples or anecdotes to illustrate your key points.
+Show genuine passion and reflect on what drives you beyond just academic success.
+Demonstrate your capacity for growth, adaptability, and commitment to ethical leadership.
+
+
+Finally and most importantly: Aim for a tone that is honest, professional and forward-looking - avoid generic or poetic expressions.
+    `;
 
     // To stream generated text output, call generateContentStream with the text input
     const result = await model.generateContentStream(prompt);
@@ -215,7 +254,52 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
         scholarship
       )} Additionally, the user may have provided information about them personally, to make the essay draft more realistic. ${JSON.stringify(
         userData
-      )}`;
+      )}
+      
+Draft a high quality scholarship essay in clean minimalist markdown without headers. This scholarship should be realistic but professional. The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
+        scholarship
+      )} Additionally, the user may have provided information about them personally, ${JSON.stringify(
+        userData
+      )}
+    
+    Reflect deeply on your personal background, goals, and contributions to your community. In your response, aim to weave a compelling story that highlights the following elements:
+
+1. Personal Story and Motivation
+- Share formative childhood or life experiences that shaped your ambition and character.
+- Explain why you chose your major or future career path and how it connects to your personal journey.
+
+2. Overcoming Challenges
+- Describe any adversity—financial, cultural, educational, or personal—you’ve faced, and explain how these obstacles influenced your growth.
+- Illustrate the steps you’ve taken to address or triumph over these barriers.
+
+3. Leadership and Initiative
+- Highlight moments where you took the lead, whether at school, in clubs, in the community, or at work.
+- Emphasize how you brought people together, organized events, or created new solutions to support others.
+
+4. Community Engagement and Service
+- Share the ways you give back—volunteering, mentorship, activism, or any initiatives you launched.
+- Discuss the impact of these efforts and how they align with your core values and future ambitions.
+
+5. Academic and Professional Development
+- Talk about significant achievements (awards, internships, fellowships, clubs) and what you learned from those experiences.
+- If applicable, detail your plans for further certifications or advanced degrees and why they are essential to your goals.
+
+6. Vision for the Future
+- Describe your long-term aspirations, both professionally and personally.
+- Explain how you plan to use your skills, education, and network to create positive change in your field or community.
+
+7. Financial Need and Determination
+- If relevant, address any financial challenges you face.
+- Convey how this scholarship support will help you focus on academics, service, and leadership, ultimately boosting your ability to give back.
+
+8. Guidelines
+Provide specific examples or anecdotes to illustrate your key points.
+Show genuine passion and reflect on what drives you beyond just academic success.
+Demonstrate your capacity for growth, adaptability, and commitment to ethical leadership.
+
+
+Finally and most importantly: Aim for a tone that is honest, professional and forward-looking - be absolutely certin to avoid generic or poetic expressions about identity or perspective.
+      `;
       await submitPrompt(prompt);
 
       // setFireScholarshipResponse("");

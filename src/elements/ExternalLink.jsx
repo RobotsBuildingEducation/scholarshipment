@@ -76,7 +76,7 @@ export const ExternalLink = ({
       // });
     }
 
-    setTimeout(() => setCopyIsClicked(false), 500);
+    setTimeout(() => setCopyIsClicked(false), 400);
   };
 
   return (

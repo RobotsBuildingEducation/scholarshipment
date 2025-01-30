@@ -23,6 +23,9 @@ import {
   Link,
   Spinner,
   CloseButton,
+  OrderedList,
+  ListItem,
+  UnorderedList,
 } from "@chakra-ui/react";
 import { updateDoc, doc, getDoc } from "firebase/firestore";
 import { database } from "../database/setup";
@@ -31,6 +34,118 @@ import { useSharedNostr } from "../hooks/useNOSTR";
 import useDidKeyStore from "../hooks/useDidKeyStore";
 import { VscAccount } from "react-icons/vsc";
 
+const sections = [
+  {
+    title: "Clear Sense of Purpose and Vision",
+    points: [
+      "Demonstrates focus on specific career fields (e.g., accounting, finance, risk management).",
+      "Expresses clear long-term goals (CPA, MBA, future nonprofit ventures).",
+      "Conveys excitement and rationale for chosen major or field of study.",
+    ],
+  },
+  {
+    title: "Authentic Personal Narrative",
+    points: [
+      "Shares personal backstory (e.g., low-income upbringing, first-generation student, single-parent household).",
+      "Highlights formative childhood experiences (e.g., building Hot Wheels rollercoasters, sewing doll dresses) to show early creativity/initiative.",
+      "Reflects honestly on struggles (financial, language barriers, lack of guidance).",
+    ],
+  },
+  {
+    title: "Overcoming Adversity and Resilience",
+    points: [
+      "Demonstrates how personal or family challenges fueled determination (financial difficulties, fear of speaking English, balancing multiple roles).",
+      "Illustrates problem-solving mindset and the capacity to persist under pressure.",
+    ],
+  },
+  {
+    title: "Leadership and Initiative",
+    points: [
+      "Mentions founding or leading organizations (e.g., 'Girls on Campus').",
+      "Takes on leadership roles in clubs (e.g., treasurer for the accounting club, YIP fellowship, organizing panels or speaker events).",
+      "Goes beyond personal gain to build communities and empower others.",
+    ],
+  },
+  {
+    title: "Community Engagement and Service",
+    points: [
+      "Provides mentorship or volunteer support (Latina Mentor Program, VITA program for taxes, stock competition representation).",
+      "Shows passion for uplifting underrepresented groups (women of color, low-income students).",
+      "Creates or contributes to programs and workshops that encourage higher education pursuits.",
+    ],
+  },
+  {
+    title: "Academic Excellence and Professional Development",
+    points: [
+      "Maintains high GPAs, Dean’s List recognition, honor societies (Alpha Chi).",
+      "Completes relevant internships (at Deloitte, Bank of America) or fellowships (YIP Institute).",
+      "Mentions specific coursework (auditing, accounting, cybersecurity, finance) and certifications (CFE, CPA) that align with career goals.",
+    ],
+  },
+  {
+    title: "Entrepreneurial and Innovative Spirit",
+    points: [
+      "Early examples of selling homemade crafts (Etsy shop, childhood gift-bag business).",
+      "Active exploration in investing (Robinhood, Forex).",
+      "Emphasizes creative problem-solving (turning cardboard boxes into picture books, forming social media communities).",
+    ],
+  },
+  {
+    title: "Collaboration and Networking",
+    points: [
+      "Highlights working in teams (Bloomberg stock competition, Deloitte audit engagements).",
+      "Demonstrates openness to seeking advice and mentorship from professors and industry professionals.",
+      "Recognizes the importance of building meaningful professional relationships.",
+    ],
+  },
+  {
+    title: "Passion for Social Impact",
+    points: [
+      "Aspires to use degree(s) for collective good, especially in underserved communities.",
+      "Aims to start nonprofits or social ventures (Girls On Campus, language learning centers).",
+      "Ties personal growth to a broader mission of equity, inclusion, and access to education.",
+    ],
+  },
+  {
+    title: "Reflective Growth Mindset",
+    points: [
+      "Acknowledges moments of uncertainty but embraces them to learn and grow.",
+      "Actively pursues self-improvement (public speaking, time management, new skills).",
+      "Demonstrates willingness to accept feedback (retaking midterms, learning from professors) and evolve.",
+    ],
+  },
+  {
+    title: "Effective Communication Skills",
+    points: [
+      "Tells a compelling story with clarity and substance.",
+      "Uses personal anecdotes to connect with the reader.",
+      "Demonstrates awareness of audience (scholarship committees, mentors, etc.).",
+    ],
+  },
+  {
+    title: "Alignment of Personal Values and Career Goals",
+    points: [
+      "Illustrates how personal convictions (integrity, empathy, community) shape professional aspirations.",
+      "Reinforces the idea that career success and social impact can (and should) coexist.",
+      "Seeks certifications and industries (anti-fraud, accounting ethics) that reflect a commitment to moral responsibility.",
+    ],
+  },
+  {
+    title: "Financial Need Paired with Determination",
+    points: [
+      "Clearly communicates financial hardships without sounding solely needy—balances it with gratitude and hope.",
+      "Frames the scholarship as a pathway to achieving bigger contributions to society, not just personal gain.",
+    ],
+  },
+  {
+    title: "Forward-Looking Ambition",
+    points: [
+      "Outlines how each current step (internship, clubs, certifications) leads to future achievements.",
+      "Shows desire to keep learning (MBA, second or third language, new tech skills).",
+      "Expresses motivation to scale impact beyond immediate circles (globally, digitally, or within specialized industries).",
+    ],
+  },
+];
 const AccountSwitcherAndProfileEditor = ({
   fetchUserDataNoLoading,
   isOpen,
@@ -345,9 +460,46 @@ const AccountSwitcherAndProfileEditor = ({
                 onChange={(e) => setDescription(e.target.value)}
               />
             </Box>
+
             <Accordion allowToggle width="100%">
               <AccordionItem>
-                <AccordionButton>
+                <AccordionButton height="60px">
+                  <Box flex="1" textAlign="left">
+                    Profile advice
+                  </Box>
+                  <AccordionIcon />
+                </AccordionButton>
+
+                <AccordionPanel>
+                  <Box mb={4}>
+                    The following list describes attributes and qualities that
+                    create successful scholarship applications. We recommend
+                    outlining what resonates with you so we can take care of the
+                    rest!
+                  </Box>
+                  <OrderedList ml="-2" spacing={0}>
+                    {sections.map((section, index) => (
+                      <ListItem key={index} fontWeight="bold">
+                        {section.title}
+                        <UnorderedList
+                          ml="-2"
+                          mt={1}
+                          fontWeight="normal"
+                          mb={3}
+                        >
+                          {section.points.map((point, i) => (
+                            <ListItem key={i} mb={2}>
+                              {point}
+                            </ListItem>
+                          ))}
+                        </UnorderedList>
+                      </ListItem>
+                    ))}
+                  </OrderedList>
+                </AccordionPanel>
+              </AccordionItem>
+              <AccordionItem>
+                <AccordionButton height="60px">
                   <Box flex="1" textAlign="left">
                     Your account key
                   </Box>
@@ -375,9 +527,9 @@ const AccountSwitcherAndProfileEditor = ({
                 </AccordionPanel>
               </AccordionItem>
               <AccordionItem>
-                <AccordionButton>
+                <AccordionButton height="60px">
                   <Box flex="1" textAlign="left">
-                    Switch Account
+                    Switch account
                   </Box>
                   <AccordionIcon />
                 </AccordionButton>

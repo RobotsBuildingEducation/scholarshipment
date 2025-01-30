@@ -358,7 +358,7 @@ const AdminPage = () => {
       );
       const scholarshipId = scholarshipRef.id;
       postNostrContent(
-        `Just published a new scholarship! View it at https://girlsoncampus.app/${scholarshipId} & learn more about the ${formData.name} scholarship due ${formData.dueDate}. \n\n Eligibility: ${formData.eligibility} \n\n #LearnWithNostr`
+        `Just published a new scholarship! View it at https://girlsoncampus.app/${scholarshipId} & learn more about the ${formData.name} scholarship due ${formData.dueDate}. \n\n #LearnWithNostr`
       );
       const fileUploadResult = await handleUpload(scholarshipId);
 

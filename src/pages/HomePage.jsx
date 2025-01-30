@@ -84,21 +84,21 @@ const HomePage = ({ isAdminMode = false }) => {
     };
   }, [passcode]);
 
-  useEffect(() => {
-    let getKeys = async () => {
-      let keySet = await auth(localStorage.getItem("local_nsec"));
+  // useEffect(() => {
+  //   let getKeys = async () => {
+  //     let keySet = await auth(localStorage.getItem("local_nsec"));
 
-      if (
-        keySet.user.npub ===
-        // "npub14vskcp90k6gwp6sxjs2jwwqpcmahg6wz3h5vzq0yn6crrsq0utts52axlt"
-        "npub1ae02dvwewx8w0z2sftpcg2ta4xyu6hc00mxuq03x2aclta6et76q90esq2"
-      ) {
-        enableSecretMode();
-      }
-    };
+  //     if (
+  //       keySet.user.npub ===
+  //       // "npub14vskcp90k6gwp6sxjs2jwwqpcmahg6wz3h5vzq0yn6crrsq0utts52axlt"
+  //       "npub1ae02dvwewx8w0z2sftpcg2ta4xyu6hc00mxuq03x2aclta6et76q90esq2"
+  //     ) {
+  //       enableSecretMode();
+  //     }
+  //   };
 
-    getKeys();
-  }, []);
+  //   getKeys();
+  // }, []);
 
   const checkUser = async () => {
     if (isAdminMode) {
@@ -121,7 +121,7 @@ const HomePage = ({ isAdminMode = false }) => {
         // const did = didDht.uri;
         console.log("NEW KEY...");
         const newKeys = await generateNostrKeys();
-        // setKeys(newKeys);
+        // setKeys(newKeys);x
 
         console.log("NEW KEY", newKeys);
         // DID Document
@@ -153,6 +153,19 @@ const HomePage = ({ isAdminMode = false }) => {
         console.log("error", { error });
       }
     } else {
+      let getKeys = async () => {
+        let keySet = await auth(localStorage.getItem("local_nsec"));
+
+        if (
+          keySet.user.npub ===
+          // "npub14vskcp90k6gwp6sxjs2jwwqpcmahg6wz3h5vzq0yn6crrsq0utts52axlt"
+          "npub1ae02dvwewx8w0z2sftpcg2ta4xyu6hc00mxuq03x2aclta6et76q90esq2"
+        ) {
+          enableSecretMode();
+        }
+      };
+
+      getKeys();
       console.log("has id...");
       setDidKey(id); // For simplicity, using DID as the key for now.
       const userDocRef = await doc(database, "users", id);

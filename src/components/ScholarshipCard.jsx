@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Text,
@@ -45,6 +45,7 @@ const ScholarshipCard = ({
   console.log("secret mode?", secretMode);
   const toast = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const isMobile = useBreakpointValue({ base: true, md: false });
 
   const images = scholarship?.fileURLs || [];
@@ -63,6 +64,13 @@ const ScholarshipCard = ({
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const handleSaveClick = () => {
+    setIsSaved(true);
+    onSaveScholarship(scholarship);
+
+    setTimeout(() => setIsSaved(false), 600); // Reset after 2s
   };
 
   return (
@@ -316,20 +324,16 @@ const ScholarshipCard = ({
             <Button
               onClick={() => {
                 onSaveScholarship(scholarship);
-                toast({
-                  title: "Scholarship Saved.",
-                  description:
-                    "The scholarship has been added to your saved collection.",
-                  status: "success",
-                  duration: 1000,
-                  isClosable: true,
-                  position: "top",
-                });
+                handleSaveClick();
+              }}
+              style={{
+                border: `2px solid ${isSaved ? "purple" : "transparent"}`,
+                color: isSaved ? "purple" : "black",
               }}
               mt={2}
             >
               <HiOutlineBookmark />
-              &nbsp;Save
+              &nbsp;{isSaved ? "Saved" : "Save"}
             </Button>
           )}
 
@@ -337,15 +341,6 @@ const ScholarshipCard = ({
             <Button
               onClick={() => {
                 removeFromSaved(scholarship, "saved");
-                toast({
-                  title: "Scholarship Removed.",
-                  description:
-                    "The scholarship has been removed from your collection.",
-                  status: "success",
-                  duration: 1000,
-                  isClosable: true,
-                  position: "top",
-                });
               }}
               mt={2}
             >
