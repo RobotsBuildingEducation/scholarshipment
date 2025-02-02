@@ -27,6 +27,10 @@ const theme = extendTheme({
           "linear-gradient(270deg, lavender, #FBE4F3, lavender, #FBE4F3)",
         backgroundSize: "800% 800%",
         animation: `${gradientAnimation} 120s ease infinite`,
+        scrollBehavior: "auto", // Overwrite Chakra's default
+      },
+      html: {
+        scrollBehavior: "auto", // Overwrite Chakra's default
       },
     },
   },

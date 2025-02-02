@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text, Flex, Button, Textarea } from "@chakra-ui/react";
+import { Box, Text, Flex, Button, Textarea, Spinner } from "@chakra-ui/react";
 import ReactMarkdown from "react-markdown";
 import ChakraUIRenderer from "chakra-ui-markdown-renderer";
 import { TbEdit, TbEditOff, TbWriting } from "react-icons/tb";
@@ -151,6 +151,7 @@ const AI = ({
         Creates a draft essay based off user profile and scholarship data
       </Text>
 
+      {isSending ? <Spinner /> : null}
       {existingDraft && renderContent(existingDraft, "existing-draft")}
       {messages &&
         messages?.length > 0 &&

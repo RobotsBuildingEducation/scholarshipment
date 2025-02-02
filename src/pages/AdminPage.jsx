@@ -89,6 +89,11 @@ const AdminPage = () => {
   const [excelData, setExcelData] = useState([]);
   const [currentRowIndex, setCurrentRowIndex] = useState(0);
 
+  const [singleSubmissionMessage, setSingleSubmissionMessage] = useState("");
+  const [batchSubmissionMessage, setBatchSubmissionMessage] = useState("");
+
+  console.log("excel data", excelData);
+
   useEffect(() => {
     let getKeys = async () => {
       let keySet = await auth(localStorage.getItem("local_nsec"));
@@ -189,15 +194,39 @@ const AdminPage = () => {
       tags: additionalTags || [], // Adjust as needed
       details: row.Description || "",
       meta: "",
-      isHighschool: row["Open to "]?.includes("HS".toLowerCase()) || false,
+      isHighschool:
+        row["Open to "]?.includes("HS") ||
+        row["Open to "]?.includes("below 18") ||
+        row["Open to "]?.includes("18+") ||
+        false,
       isCollege:
         row["Open to "]?.includes("College") ||
         row["Open to "]?.includes("Grad") ||
-        row["Open to "]?.includes("College") ||
+        row["Open to "]?.includes("18+") ||
         false,
-      isUnderserved: false, // Adjust as needed
-      isInternational: false, // Adjust as needed
-      isStateOnly: false, // Adjust as needed
+      isUnderserved:
+        row["Immigration status/Eligibility Requirements "]
+          .toLocaleLowerCase()
+          .includes("undocumented") ||
+        row["Immigration status/Eligibility Requirements "]
+          .toLocaleLowerCase()
+          .includes("DACA") ||
+        row["Immigration status/Eligibility Requirements "]
+          .toLocaleLowerCase()
+          .includes("underserved") ||
+        row["Description"].toLocaleLowerCase().includes("undocumented") ||
+        row["Description"].toLocaleLowerCase().includes("DACA") ||
+        row["Description"].toLocaleLowerCase().includes("underserved") ||
+        row["Name"].toLocaleLowerCase().includes("undocumented") ||
+        row["Name"].toLocaleLowerCase().includes("DACA") ||
+        row["Name"].toLocaleLowerCase().includes("underserved") ||
+        false,
+      isInternational:
+        row["Immigration status/Eligibility Requirements "]
+          .toLocaleLowerCase()
+          .includes("international") ||
+        row["Description"].toLocaleLowerCase().includes("international"),
+      isStateOnly: false,
       isSpotlight: false,
       fileURLs: [],
     });
@@ -348,6 +377,8 @@ const AdminPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSingleSubmissionMessage(""); // clear old message
+
     try {
       const scholarshipRef = await addDoc(
         collection(database, "scholarships"),
@@ -357,16 +388,21 @@ const AdminPage = () => {
         }
       );
       const scholarshipId = scholarshipRef.id;
-      postNostrContent(
-        `Just published a new scholarship! View it at https://girlsoncampus.app/${scholarshipId} & learn more about the ${formData.name} scholarship due ${formData.dueDate}. \n\n #LearnWithNostr`
-      );
+
+      if (formData.name && formData.dueDate !== "Error: Invalid date format") {
+        postNostrContent(
+          `Just published a new scholarship! View it at https://girlsoncampus.app/${scholarshipId} & learn more about the ${formData.name} scholarship due ${formData.dueDate}. \n\n #LearnWithNostr`
+        );
+      }
       const fileUploadResult = await handleUpload(scholarshipId);
 
       await updateDoc(doc(database, "scholarships", scholarshipId), {
         fileURLs: fileUploadResult,
       });
 
-      alert("Scholarship published successfully");
+      setSingleSubmissionMessage(
+        `Scholarship published successfully: ${formData.name}`
+      );
       if (excelMode && currentRowIndex < excelData.length - 1) {
         setCurrentRowIndex((prevIndex) => prevIndex + 1);
       } else if (excelMode) {
@@ -398,6 +434,7 @@ const AdminPage = () => {
       setFiles([]);
     } catch (error) {
       console.error("Error adding document: ", error);
+      setSingleSubmissionMessage("Error publishing scholarship.");
     }
   };
 
@@ -475,6 +512,150 @@ const AdminPage = () => {
     submitPrompt([{ role: "user", content: prompt }]);
   };
 
+  const handleSubmitAll = async () => {
+    setBatchSubmissionMessage("");
+    if (!excelMode || excelData.length === 0) {
+      return;
+    }
+
+    let successCount = 0;
+
+    for (let i = 0; i < excelData.length; i++) {
+      const row = excelData[i];
+      try {
+        // Convert row directly into a doc object, similar to `populateForm`.
+        const usedColumns = [
+          "Name",
+          "Date Due",
+          "Immigration status/Eligibility Requirements ",
+          "Race/Ethnicity/Gender",
+          "Amount ",
+          "Description",
+          "Open to ",
+          "link",
+        ];
+        const additionalTags = [];
+
+        for (const key in row) {
+          if (row[key] && !usedColumns.includes(key)) {
+            if (key.toLocaleLowerCase().includes("full ride")) {
+              additionalTags.push("Full ride");
+            } else if (key.toLocaleLowerCase().includes("rolling")) {
+              additionalTags.push("Rolling");
+            } else {
+              const data = row[key].split(", ");
+              data.forEach((word) => {
+                additionalTags.push(word);
+              });
+            }
+          }
+        }
+
+        const convertDateFormat = (dateStr) => {
+          try {
+            const [month, day, year] = dateStr.split("/");
+            if (
+              !month ||
+              !day ||
+              !year ||
+              isNaN(month) ||
+              isNaN(day) ||
+              isNaN(year)
+            )
+              return "";
+            return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+          } catch (error) {
+            return "";
+          }
+        };
+
+        // Build doc data
+        const rowDocData = {
+          name: row.Name || "",
+          dueDate: convertDateFormat(row["Date Due"]) || "",
+          year: "",
+          eligibility:
+            row["Immigration status/Eligibility Requirements "] || "",
+          major: "",
+          amount: parseFloat(row["Amount "]?.replace(/[^0-9.-]+/g, "")) || 0,
+          ethnicity: row["Race/Ethnicity/Gender"] || "",
+          link: row.link || "",
+          tags: additionalTags,
+          details: row.Description || "",
+          meta: "",
+          isHighschool:
+            row["Open to "]?.includes("HS") ||
+            row["Open to "]?.includes("below 18") ||
+            row["Open to "]?.includes("18+") ||
+            false,
+          isCollege:
+            row["Open to "]?.includes("College") ||
+            row["Open to "]?.includes("Grad") ||
+            row["Open to "]?.includes("18+") ||
+            false,
+          isUnderserved:
+            row["Immigration status/Eligibility Requirements "]
+              .toLocaleLowerCase()
+              .includes("undocumented") ||
+            row["Immigration status/Eligibility Requirements "]
+              .toLocaleLowerCase()
+              .includes("DACA") ||
+            row["Immigration status/Eligibility Requirements "]
+              .toLocaleLowerCase()
+              .includes("underserved") ||
+            row["Description"].toLocaleLowerCase().includes("undocumented") ||
+            row["Description"].toLocaleLowerCase().includes("DACA") ||
+            row["Description"].toLocaleLowerCase().includes("underserved") ||
+            row["Name"].toLocaleLowerCase().includes("undocumented") ||
+            row["Name"].toLocaleLowerCase().includes("DACA") ||
+            row["Name"].toLocaleLowerCase().includes("underserved") ||
+            false,
+          isInternational:
+            row["Immigration status/Eligibility Requirements "]
+              .toLocaleLowerCase()
+              .includes("international") ||
+            row["Description"].toLocaleLowerCase().includes("international"),
+          isStateOnly: false,
+          isSpotlight: false,
+          fileURLs: [],
+        };
+
+        // Create doc
+        const scholarshipRef = await addDoc(
+          collection(database, "scholarships"),
+          rowDocData
+        );
+        const scholarshipId = scholarshipRef.id;
+
+        // Optional: Post on Nostr
+        postNostrContent(
+          `Just published a new scholarship! View it at https://girlsoncampus.app/${scholarshipId} & learn more about the ${rowDocData.name} scholarship due ${rowDocData.dueDate}. \n\n #LearnWithNostr`
+        );
+
+        // If you want to upload the same files for *every* row, uncomment:
+        /*
+        const fileUploadResult = await handleUpload(scholarshipId);
+        await updateDoc(doc(database, "scholarships", scholarshipId), {
+          fileURLs: fileUploadResult,
+        });
+        */
+
+        successCount++;
+      } catch (error) {
+        console.error("Error adding scholarship from row:", error);
+        // Continue to next row
+      }
+    }
+
+    setBatchSubmissionMessage(
+      `Successfully submitted ${successCount} scholarship(s) out of ${excelData.length}.`
+    );
+    // Optionally turn off Excel mode after batch submission:
+    setExcelMode(false);
+  };
+
+  console.log("FORM DATA FINaL", formData);
+
   if (secretMode) {
     return (
       <Container>
@@ -521,6 +702,7 @@ const AdminPage = () => {
           </FormControl>
           <br />
           <br />
+
           {!excelMode && (
             <FormControl mb={4}>
               <FormLabel>Upload CSV for Excel Mode (optional)</FormLabel>
@@ -531,6 +713,23 @@ const AdminPage = () => {
               </Text>
               <Input type="file" onChange={handleFileUpload} />
             </FormControl>
+          )}
+
+          {excelMode && excelData.length > 0 && (
+            <>
+              <Text fontSize="md" mb={2}>
+                <strong>Excel Mode Active:</strong> Found {excelData.length}{" "}
+                row(s).
+              </Text>
+              <Button colorScheme="green" onClick={handleSubmitAll}>
+                Submit All
+              </Button>
+              {batchSubmissionMessage && (
+                <Text color="blue.600" mt={2}>
+                  {batchSubmissionMessage}
+                </Text>
+              )}
+            </>
           )}
           <br />
           <br />
@@ -818,6 +1017,11 @@ const AdminPage = () => {
           >
             {excelMode ? "Submit and Next" : "Publish Scholarship"}
           </Button>
+          {singleSubmissionMessage && (
+            <Text color="green.600" mt={2}>
+              {singleSubmissionMessage}
+            </Text>
+          )}
         </Box>
         <br />
         <br />

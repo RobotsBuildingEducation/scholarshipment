@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { DidDht } from "@web5/dids";
 import { DidJwk } from "@web5/dids";
 
-import { doc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { database } from "../database/setup";
 import { Box, Input, keyframes, Skeleton } from "@chakra-ui/react";
 
@@ -111,7 +111,6 @@ const HomePage = ({ isAdminMode = false }) => {
     const id = localStorage.getItem("uniqueId");
     if (!id) {
       try {
-        console.log("NO ID");
         // const didDht = await DidDht.create({ publish: true });
 
         // DID and its associated data which can be exported and used in different contexts/apps
@@ -119,11 +118,10 @@ const HomePage = ({ isAdminMode = false }) => {
 
         // DID string
         // const did = didDht.uri;
-        console.log("NEW KEY...");
+
         const newKeys = await generateNostrKeys();
         // setKeys(newKeys);x
 
-        console.log("NEW KEY", newKeys);
         // DID Document
         // console.log("did dht", didDht);
         // console.log("document", didDht.document);
@@ -138,11 +136,10 @@ const HomePage = ({ isAdminMode = false }) => {
         let id = newKeys.npub;
         localStorage.setItem("uniqueId", id);
         setDidKey(id); // For simplicity, using DID as the key for now.
-        console.log("hello?");
+
         await setDoc(doc(database, "users", id), {
           createdAt: new Date().toISOString(),
         });
-        console.log("DB", database);
       } catch (error) {
         // localStorage.setItem("uniqueId", "global");
         // await setDoc(doc(database, "users", id), {
@@ -152,6 +149,12 @@ const HomePage = ({ isAdminMode = false }) => {
         console.log("error", error);
         console.log("error", { error });
       }
+
+      auth(localStorage.getItem("local_nsec")).then((res) =>
+        postNostrContent(
+          `gm nostr! I've joined #LearnWithNostr through https://girlsoncampus.app.`
+        )
+      );
     } else {
       let getKeys = async () => {
         let keySet = await auth(localStorage.getItem("local_nsec"));
@@ -167,8 +170,19 @@ const HomePage = ({ isAdminMode = false }) => {
 
       getKeys();
       console.log("has id...");
-      setDidKey(id); // For simplicity, using DID as the key for now.
       const userDocRef = await doc(database, "users", id);
+
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        console.log("it exists");
+      } else {
+        await setDoc(doc(database, "users", id), {
+          createdAt: new Date().toISOString(),
+        });
+        console.log("failed");
+      }
+
+      setDidKey(id); // For simplicity, using DID as the key for now.
 
       // const userDoc = await getDoc(userDocRef);
     }

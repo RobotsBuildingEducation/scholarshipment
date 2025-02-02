@@ -1,4 +1,7 @@
 /* src/components/Banner.css */
+html {
+  scroll-behavior: auto !important; /* NOT 'smooth' */
+}
 /* 
 html {
   height: 200px;

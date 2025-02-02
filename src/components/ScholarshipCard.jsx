@@ -84,11 +84,11 @@ const ScholarshipCard = ({
         width: "100%",
         minHeight: "100%",
 
-        boxShadow: "0px 12px 12px -6px rgba(42, 51, 69, 0.04)",
+        boxShadow: "0px 12px 12px -6px rgba(250, 199, 253, 0.15)",
         borderRadius: 32,
         backgroundColor: "rgba(255,255,255, 0.1)",
         // border: "1px solid red",
-        border: "1px solid lightgray",
+        border: "1px solid rgba(214, 159, 184, 0.15)",
         fontSize: 12,
       }}
     >
@@ -190,7 +190,7 @@ const ScholarshipCard = ({
             key={index}
             style={{ backgroundColor: "#C95F8F", color: "white" }}
           >
-            {tag}
+            {tag === "Rolling" ? "Rolling deadline" : tag}
           </Tag>
         ))}
       </Wrap>
@@ -209,7 +209,10 @@ const ScholarshipCard = ({
 
       <Box p={6} style={{ marginTop: "-4px" }}>
         <Text>
-          <b>Due Date:</b> {scholarship?.dueDate || "-"}
+          <b>Due Date</b> <br />
+          {scholarship?.dueDate.toLowerCase().includes("error")
+            ? "Not available. Visit website to learn more."
+            : scholarship?.dueDate}
         </Text>
 
         {scholarship?.eligibility ? (

@@ -1,6 +1,6 @@
 // Feed.jsx
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useLayoutEffect } from "react";
 
 import {
   collection,
@@ -166,65 +166,6 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
   );
   const { enableSecretMode, secretMode } = useDidKeyStore();
 
-  const fetchGoogleAI = async (scholarship, userData) => {
-    // Provide a prompt that contains text
-    // const prompt = "Write a story about a magic backpack.";
-
-    const prompt = `Draft a high quality scholarship essay in clean minimalist markdown without headers. This scholarship should be  professional and should be certain to avoid poetric or generic expressions about identity and perspective. The following JSON tells you more about the scholarship, with the meta field providing direct information from the creator ${JSON.stringify(
-      scholarship
-    )} Additionally, the user may have provided information about them personally, ${JSON.stringify(
-      userData
-    )}
-    
-    Reflect deeply on your personal background, goals, and contributions to your community. In your response, aim to weave a compelling story that highlights the following elements:
-
-1. Personal Story and Motivation
-- Share formative childhood or life experiences that shaped your ambition and character.
-- Explain why you chose your major or future career path and how it connects to your personal journey.
-
-2. Overcoming Challenges
-- Describe any adversity—financial, cultural, educational, or personal—you’ve faced, and explain how these obstacles influenced your growth.
-- Illustrate the steps you’ve taken to address or triumph over these barriers.
-
-3. Leadership and Initiative
-- Highlight moments where you took the lead, whether at school, in clubs, in the community, or at work.
-- Emphasize how you brought people together, organized events, or created new solutions to support others.
-
-4. Community Engagement and Service
-- Share the ways you give back—volunteering, mentorship, activism, or any initiatives you launched.
-- Discuss the impact of these efforts and how they align with your core values and future ambitions.
-
-5. Academic and Professional Development
-- Talk about significant achievements (awards, internships, fellowships, clubs) and what you learned from those experiences.
-- If applicable, detail your plans for further certifications or advanced degrees and why they are essential to your goals.
-
-6. Vision for the Future
-- Describe your long-term aspirations, both professionally and personally.
-- Explain how you plan to use your skills, education, and network to create positive change in your field or community.
-
-7. Financial Need and Determination
-- If relevant, address any financial challenges you face.
-- Convey how this scholarship support will help you focus on academics, service, and leadership, ultimately boosting your ability to give back.
-
-8. Guidelines
-Provide specific examples or anecdotes to illustrate your key points.
-Show genuine passion and reflect on what drives you beyond just academic success.
-Demonstrate your capacity for growth, adaptability, and commitment to ethical leadership.
-
-
-Finally and most importantly: Aim for a tone that is honest, professional and forward-looking - avoid generic or poetic expressions.
-    `;
-
-    // To stream generated text output, call generateContentStream with the text input
-    const result = await model.generateContentStream(prompt);
-
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-
-      setFireScholarshipResponse((prevText) => prevText + chunkText);
-    }
-  };
-
   const onSend = async (scholarship, generating = false) => {
     setIsSending(true);
     setSelectedScholarship(scholarship);
@@ -243,8 +184,9 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
       setExistingDraft(draftData.draftContent);
       setOriginalDraft(draftData?.originalContent);
       setFormText(draftData.draftContent);
-      // setFireScholarshipResponse(draftData);
       setIsSending(false);
+
+      // setFireScholarshipResponse(draftData);
     } else {
       resetMessages();
       setExistingDraft("");
@@ -300,7 +242,7 @@ Demonstrate your capacity for growth, adaptability, and commitment to ethical le
 
 Finally and most importantly: Aim for a tone that is honest, professional and forward-looking - be absolutely certin to avoid generic or poetic expressions about identity or perspective.
       `;
-      await submitPrompt(prompt);
+      submitPrompt(prompt);
 
       // setFireScholarshipResponse("");
 
@@ -463,6 +405,7 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
       // 1) Global search: search across ALL scholarships, ignoring viewMode & filters
       const lowerQuery = searchQuery.toLowerCase();
       const results = allScholarships.filter((sch) => {
+        // console.log("filtering scholarship...", json.stringify)
         return JSON.stringify(sch).toLowerCase().includes(lowerQuery);
       });
 
@@ -491,9 +434,18 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
   }, [searchQuery]);
   // Always load all scholarships in one go
   const loadScholarships = async (view = "spotlight") => {
+    function parseAsEndOfDay(dateStr) {
+      // dateStr is "YYYY-MM-DD"
+      const [year, month, day] = dateStr.split("-").map(Number);
+      // Create a local date at 23:59:59.999 of that day
+      return new Date(year, month - 1, day, 23, 59, 59, 999);
+    }
     // window.alert("ok");
 
     setViewMode(view);
+
+    const now = new Date();
+
     if (view !== "spotlight") {
       setIsRenderingSpotlight(false);
     }
@@ -507,16 +459,56 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           ...doc.data(),
         }));
 
-        // Store them in allScholarships
-        setAllScholarships(loadedScholarships);
+        const expired = loadedScholarships.filter((sch) => {
+          if (!sch.dueDate) return false; // up to you: treat no dueDate as never expiring, or handle differently
+          const dueLocalEOD = parseAsEndOfDay(sch.dueDate);
+
+          return dueLocalEOD < now;
+        });
+
+        const nonExpired = loadedScholarships.filter((sch) => {
+          if (!sch.dueDate) return true; // keep if no dueDate
+          if (sch.dueDate.includes("Error: Invalid date format")) {
+            return true;
+          }
+          const dueLocalEOD = parseAsEndOfDay(sch.dueDate);
+
+          return dueLocalEOD >= now;
+        });
+
+        setAllScholarships(nonExpired);
 
         // By default, maybe show "spotlight" if your initial viewMode is "spotlight"
         // but you *still* keep the entire dataset in `allScholarships`
 
         if (view === "spotlight") {
+          console.log("loadedScholarships LENGTH", loadedScholarships.length);
+
           setFilteredScholarships(
             loadedScholarships.filter((sch) => sch.isSpotlight)
           );
+
+          for (const expScholarship of expired) {
+            // Copy to "archivedScholarships"
+
+            const archivedRef = doc(
+              database,
+              "archivedScholarships",
+              expScholarship.id
+            );
+            await setDoc(archivedRef, {
+              ...expScholarship,
+              archivedAt: new Date(),
+            });
+
+            // Remove from original "scholarships"
+            const originalRef = doc(
+              database,
+              "scholarships",
+              expScholarship.id
+            );
+            await deleteDoc(originalRef);
+          }
         } else {
           setFilteredScholarships(loadedScholarships);
         }
@@ -524,8 +516,15 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
         console.log("error loading scholarships", error);
       }
     } else {
-      // setAllScholarships(allScholarships)
-      setFilteredScholarships(allScholarships);
+      const now = new Date();
+      const nonExpired = allScholarships.filter((sch) => {
+        if (!sch.dueDate) return true;
+        const dueLocalEOD = parseAsEndOfDay(sch.dueDate);
+        return dueLocalEOD >= now;
+      });
+
+      setAllScholarships(nonExpired);
+      setFilteredScholarships(nonExpired);
     }
   };
 
@@ -631,7 +630,7 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
         : collectionType === "drafts"
         ? "drafts"
         : "spotlight";
-    if (list === "saved" || list === "drafts") {
+    if (list === "savedScholarships" || list === "drafts") {
       try {
         await deleteDoc(
           doc(database, `users/${didKey}/${list}`, scholarship.id)
@@ -773,6 +772,8 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
   };
 
   const handleViewDraftsClick = () => {
+    setLocalInput("");
+
     setSearchQuery("");
     navigate("/");
 
@@ -780,12 +781,14 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
   };
 
   const handleViewSavedClick = async () => {
+    setLocalInput("");
     setSearchQuery("");
     navigate("/");
     fetchSavedScholarships("saved");
   };
 
   const handleViewAllClick = () => {
+    setLocalInput("");
     setSearchQuery("");
     navigate("/");
     setViewMode("all");
@@ -1100,8 +1103,11 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
             borderRadius="34%"
             style={{ cursor: "pointer" }}
             onClick={() => {
+              setLocalInput("");
+              setSearchQuery("");
               setViewMode("spotlight");
               setIsRenderingSpotlight(true);
+
               navigate(`/`);
             }}
           />
@@ -1135,7 +1141,7 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           <Box flex="1" ml={4} width="100%">
             <input
               type="text"
-              placeholder={"Search scholarship data"}
+              placeholder={"Search scholarships"}
               // value={searchQuery}
               // onChange={(event) => debouncedOnChange(event.target.value)}
 

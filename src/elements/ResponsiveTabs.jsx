@@ -12,6 +12,7 @@ import {
   useBreakpointValue,
   Box,
 } from "@chakra-ui/react";
+import { useEffect } from "react";
 import { HiOutlineBookmark, HiOutlineSparkles } from "react-icons/hi2";
 
 const ResponsiveTabs = ({
@@ -24,6 +25,9 @@ const ResponsiveTabs = ({
   handleRecommendedClick,
   children,
 }) => {
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [viewMode]); // Runs every time the viewMode changes
   const tabOrientation = useBreakpointValue({
     base: "horizontal",
     md: "horizontal",
