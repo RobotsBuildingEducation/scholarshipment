@@ -1,12 +1,11 @@
 // Feed.jsx
 
-import React, { useState, useEffect, useMemo, useLayoutEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 import {
   collection,
   getDocs,
   query,
-  where,
   updateDoc,
   doc,
   getDoc,
@@ -19,12 +18,6 @@ import { database, model } from "../database/setup";
 import {
   Container,
   Heading,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  Spinner,
   Button,
   useDisclosure,
   useBreakpointValue,
@@ -43,19 +36,22 @@ import {
   DrawerHeader,
   DrawerBody,
   DrawerFooter,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalCloseButton,
-  ModalBody,
+  Checkbox,
+  Stack,
+  FormControl,
+  FormLabel,
+  Input as ChakraInput,
+  Slider,
+  SliderFilledTrack,
+  SliderTrack,
+  SliderThumb,
+  Select,
 } from "@chakra-ui/react";
-import UserProfileModal from "./UserProfileModal";
+
 import { useChatCompletion } from "../hooks/useChatCompletion";
 import ScholarshipList from "./ScholarshipList";
 import AiDrawer from "./AiDrawer";
 import ResponsiveTabs from "../elements/ResponsiveTabs";
-import { SettingsIcon } from "@chakra-ui/icons";
 
 import logo_transparent from "../assets/logo_transparent.png";
 import EditProfileModal from "./EditProfileModal";
@@ -69,6 +65,8 @@ import { SiCashapp } from "react-icons/si";
 import { WalletModal } from "./WalletModal";
 import { useSimpleGeminiChat } from "../hooks/useGeminiChat";
 import { InstallAppModal } from "./InstallModal";
+import { TbFilterSearch } from "react-icons/tb";
+import { IoAppsOutline } from "react-icons/io5";
 
 // import logo_transparent from "../assets/logo_transparent.png";
 
@@ -116,6 +114,18 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
     onClose: onWalletClose,
   } = useDisclosure();
 
+  const [selectedCollection, setSelectedCollection] = useState("scholarships");
+
+  const [isControlFilterActive, setIsControlFilterActive] = useState(false);
+  const [filters, setFilters] = useState({
+    amount: 10000, // maximum amount filter (if applicable)
+    isHighschool: false, // if true, only show high school scholarships
+    isCollege: false, // if true, only show college scholarships
+    isUnderserved: false, // if true, only show underserved scholarships
+    isInternational: false, // if true, only show international scholarships
+    dueDate: "", // optional due date filter
+  });
+
   const isMobile = useBreakpointValue({ base: true, md: false });
   const [localInput, setLocalInput] = useState("");
 
@@ -125,8 +135,7 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
   const [filteredScholarships, setFilteredScholarships] = useState([]);
   const [drafts, setDrafts] = useState([]);
   const [savedScholarships, setSavedScholarships] = useState([]);
-  const [filters, setFilters] = useState(null);
-  const [tempFilters, setTempFilters] = useState({});
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [description, setDescription] = useState("");
@@ -268,10 +277,9 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
         setName(userData.name || "");
         setEmail(userData.email || "");
         setDescription(userData.description || "");
-        if (userData.filters) {
-          setTempFilters(userData.filters);
-          setFilters(userData.filters);
-        }
+        // if (userData.filters) {
+        //   setFilters(userData.filters);
+        // }
       }
       setIsFetchingUserData(false);
     } catch (error) {
@@ -290,10 +298,9 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
         setName(userData.name || "");
         setEmail(userData.email || "");
         setDescription(userData.description || "");
-        if (userData.filters) {
-          setTempFilters(userData.filters);
-          setFilters(userData.filters);
-        }
+        // if (userData.filters) {
+        //   setFilters(userData.filters);
+        // }
       }
     } catch (error) {
       // setIsFetchingUserData(false);
@@ -433,7 +440,10 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
     }
   }, [searchQuery]);
   // Always load all scholarships in one go
-  const loadScholarships = async (view = "spotlight") => {
+  const loadScholarships = async (
+    view = "spotlight",
+    isCollectionSwitch = false
+  ) => {
     function parseAsEndOfDay(dateStr) {
       // dateStr is "YYYY-MM-DD"
       const [year, month, day] = dateStr.split("-").map(Number);
@@ -450,9 +460,11 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
       setIsRenderingSpotlight(false);
     }
 
-    if (allScholarships.length < 1) {
+    console.log("ALL SCHOLLARS", allScholarships);
+    if (allScholarships.length < 1 || isCollectionSwitch) {
       try {
-        const q = query(collection(database, "scholarships"));
+        // const q = query(collection(database, "scholarships"));
+        const q = query(collection(database, selectedCollection));
         const querySnapshot = await getDocs(q);
         const loadedScholarships = querySnapshot.docs.map((doc) => ({
           id: doc.id,
@@ -504,7 +516,8 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
             // Remove from original "scholarships"
             const originalRef = doc(
               database,
-              "scholarships",
+              // "scholarships",
+              selectedCollection,
               expScholarship.id
             );
             await deleteDoc(originalRef);
@@ -563,11 +576,9 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
     try {
       if (didKey) {
         await updateDoc(doc(database, "users", didKey), {
-          filters: tempFilters,
           name: name,
           email: email,
         });
-        setFilters(tempFilters);
 
         console.log("Settings saved successfully!");
       } else {
@@ -612,7 +623,9 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
 
   const handleDeleteScholarship = async (scholarship) => {
     try {
-      await deleteDoc(doc(database, "scholarships", scholarship.id));
+      // await deleteDoc(doc(database, "scholarships", scholarship.id));
+      await deleteDoc(doc(database, selectedCollection, scholarship.id));
+
       setScholarships(scholarships.filter((sch) => sch.id !== scholarship.id));
       setFilteredScholarships(
         filteredScholarships.filter((sch) => sch.id !== scholarship.id)
@@ -657,7 +670,8 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
       }
     } else {
       try {
-        const docRef = doc(database, "scholarships", scholarship.id);
+        // const docRef = doc(database, "scholarships", scholarship.id);
+        const docRef = doc(database, selectedCollection, scholarship.id);
         await updateDoc(docRef, { isSpotlight: false });
 
         // Optionally update your local states so the UI
@@ -681,8 +695,12 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
 
   const handleUpdateScholarship = async (updatedScholarship) => {
     try {
+      // await updateDoc(
+      //   doc(database, "scholarships", updatedScholarship.id),
+      //   updatedScholarship
+      // );
       await updateDoc(
-        doc(database, "scholarships", updatedScholarship.id),
+        doc(database, selectedCollection, updatedScholarship.id),
         updatedScholarship
       );
       setScholarships(
@@ -772,6 +790,8 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
   };
 
   const handleViewDraftsClick = () => {
+    setIsControlFilterActive(false);
+
     setLocalInput("");
 
     setSearchQuery("");
@@ -781,6 +801,7 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
   };
 
   const handleViewSavedClick = async () => {
+    setIsControlFilterActive(false);
     setLocalInput("");
     setSearchQuery("");
     navigate("/");
@@ -833,6 +854,45 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
       }
     );
   };
+
+  const applyFilters = () => {
+    let filtered = allScholarships;
+
+    // Filter by scholarship amount (if scholarship.amount exists)
+    filtered = filtered.filter((scholarship) => {
+      const amount = scholarship.amount || 0;
+      return amount <= filters.amount;
+    });
+
+    // Filter by boolean flags – if the filter value is false, we don't filter out; if it's true, then we only pass scholarships that are true.
+    filtered = filtered.filter((scholarship) => {
+      return (
+        (!filters.isHighschool || scholarship.isHighschool === true) &&
+        (!filters.isCollege || scholarship.isCollege === true) &&
+        (!filters.isUnderserved || scholarship.isUnderserved === true) &&
+        (!filters.isInternational || scholarship.isInternational === true)
+      );
+    });
+
+    // Filter by due date if set.
+    if (filters.dueDate) {
+      const selectedDate = new Date(filters.dueDate);
+      filtered = filtered.filter((scholarship) => {
+        if (!scholarship.dueDate) return true;
+        const scholarshipDue = new Date(scholarship.dueDate);
+        // For example, show scholarships due on or after the selected date.
+        return scholarshipDue <= selectedDate;
+      });
+    }
+
+    setFilteredScholarships(filtered);
+  };
+
+  useEffect(() => {
+    if (viewMode !== "spotlight") {
+      applyFilters();
+    }
+  }, [filters, allScholarships]);
 
   // alert(!(viewMode === "spotlight"));
   // alert(params.scholarshipID && viewMode !== "spotlight");
@@ -974,7 +1034,9 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           {viewMode === "all" && (
             <ScholarshipList
               scholarships={
-                searchQuery.length > 0 ? filteredScholarships : allScholarships
+                searchQuery.length > 0 || isControlFilterActive
+                  ? filteredScholarships
+                  : allScholarships
               }
               onSaveScholarship={handleSaveScholarship}
               onSend={onSend}
@@ -1055,6 +1117,15 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
     }
   }, [isAiDrawerOpen]);
 
+  useEffect(() => {
+    // window.alert(isRenderingSpotlight);
+    // Clear cached data and load the new collection when selectedCollection changes
+    if (!isRenderingSpotlight) {
+      setAllScholarships([]);
+      loadScholarships("all", true);
+    }
+  }, [selectedCollection]);
+
   return (
     <Container
       width="100%"
@@ -1130,7 +1201,7 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
             onClick={onConnectDrawerOpen}
             boxShadow="0.5px 0.5px 1px 0px black"
           >
-            <SettingsIcon
+            <IoAppsOutline
               style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
             />
           </Button>
@@ -1141,7 +1212,7 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           <Box flex="1" ml={4} width="100%">
             <input
               type="text"
-              placeholder={"Search scholarships"}
+              placeholder={"Search anything"}
               // value={searchQuery}
               // onChange={(event) => debouncedOnChange(event.target.value)}
 
@@ -1156,6 +1227,15 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
               // disabled={!(viewMode === "spotlight" || viewMode === "all")}
             />
           </Box>
+          <Button
+            ml={2}
+            onClick={onFiltersOpen}
+            boxShadow="0.5px 0.5px 1px 0px black"
+          >
+            <TbFilterSearch
+              style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
+            />
+          </Button>
         </Box>
       </div>
 
@@ -1168,6 +1248,10 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           handleViewSavedClick={handleViewSavedClick}
           handleMyScholarshipsClick={handleMyScholarshipsClick}
           handleRecommendedClick={handleRecommendedClick}
+          loadScholarships={loadScholarships}
+          setSelectedCollection={setSelectedCollection}
+          selectedCollection={selectedCollection}
+          setIsRenderingSpotlight={setIsRenderingSpotlight}
         >
           {feedRender}
         </ResponsiveTabs>
@@ -1183,8 +1267,6 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           initialName={name}
           initialEmail={email}
           initialDescription={description}
-          tempFilters={tempFilters}
-          setTempFilters={setTempFilters}
           handleSaveSettings={handleSaveSettings}
           handleSubmitFilters={filterScholarships}
         />
@@ -1218,6 +1300,142 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
       ) : null}
 
       <Drawer
+        isOpen={isFiltersOpen}
+        placement="right"
+        onClose={onFiltersClose}
+        blockScrollOnMount={false}
+      >
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader display="flex" alignItems={"center"}>
+            {" "}
+            <TbFilterSearch />
+            &nbsp; More Filter Controls
+          </DrawerHeader>
+
+          <DrawerBody>
+            {/* Scholarship Amount Filter */}
+
+            {/* Due Date Filter */}
+            <FormControl mb={6}>
+              <FormLabel>Due Date</FormLabel>
+              <ChakraInput
+                type="date"
+                value={filters.dueDate}
+                onChange={(e) => {
+                  setFilters((prev) => ({ ...prev, dueDate: e.target.value }));
+                  setIsControlFilterActive(true);
+                }}
+              />
+            </FormControl>
+            <FormControl mb={6}>
+              <FormLabel>Scholarship Amount (Maximum)</FormLabel>
+              <HStack spacing={4}>
+                <Box flex="1">
+                  <Slider
+                    colorScheme="pink"
+                    min={0}
+                    max={50000}
+                    step={500}
+                    value={filters.amount}
+                    onChange={(val) => {
+                      setFilters((prev) => ({ ...prev, amount: val }));
+                      setIsControlFilterActive(true);
+                    }}
+                  >
+                    <SliderTrack>
+                      <SliderFilledTrack />
+                    </SliderTrack>
+                    <SliderThumb />
+                  </Slider>
+                </Box>
+                {/* <Box width="100px">
+                  <ChakraInput
+                    type="number"
+                    value={filters.amount}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        amount: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </Box> */}
+              </HStack>
+              <Box mt={2} fontSize="sm" color="gray.600">
+                Selected Maximum Amount: ${filters.amount}
+              </Box>
+            </FormControl>
+
+            {/* Boolean Filters */}
+            <FormControl mb={6}>
+              <FormLabel>Scholarship Categories</FormLabel>
+              <Stack spacing={2}>
+                <Checkbox
+                  colorScheme="pink"
+                  isChecked={filters.isHighschool}
+                  onChange={(e) => {
+                    setFilters((prev) => ({
+                      ...prev,
+                      isHighschool: e.target.checked,
+                    }));
+                    setIsControlFilterActive(true);
+                  }}
+                >
+                  High School
+                </Checkbox>
+                <Checkbox
+                  colorScheme="pink"
+                  isChecked={filters.isCollege}
+                  onChange={(e) => {
+                    setFilters((prev) => ({
+                      ...prev,
+                      isCollege: e.target.checked,
+                    }));
+                    setIsControlFilterActive(true);
+                  }}
+                >
+                  College
+                </Checkbox>
+                <Checkbox
+                  colorScheme="pink"
+                  isChecked={filters.isUnderserved}
+                  onChange={(e) => {
+                    setFilters((prev) => ({
+                      ...prev,
+                      isUnderserved: e.target.checked,
+                    }));
+                    setIsControlFilterActive(true);
+                  }}
+                >
+                  Underserved
+                </Checkbox>
+                <Checkbox
+                  colorScheme="pink"
+                  isChecked={filters.isInternational}
+                  onChange={(e) => {
+                    setFilters((prev) => ({
+                      ...prev,
+                      isInternational: e.target.checked,
+                    }));
+                    setIsControlFilterActive(true);
+                  }}
+                >
+                  International
+                </Checkbox>
+              </Stack>
+            </FormControl>
+          </DrawerBody>
+          <DrawerFooter>
+            <Button variant="outline" mr={3} onClick={onFiltersClose}>
+              Close
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer
         isOpen={isConnectDrawerOpen}
         placement="right"
         onClose={onConnectDrawerClose}
@@ -1226,7 +1444,11 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
         {/* <DrawerOverlay /> */}
         <DrawerContent>
           <DrawerCloseButton />
-          <DrawerHeader>Settings</DrawerHeader>
+          <DrawerHeader display="flex" alignItems={"center"}>
+            {" "}
+            <IoAppsOutline />
+            &nbsp; Navigate
+          </DrawerHeader>
 
           <DrawerBody>
             <VStack spacing={4}>

@@ -101,6 +101,9 @@ const HomePage = ({ isAdminMode = false }) => {
   // }, []);
 
   const checkUser = async () => {
+    setTimeout(() => {
+      setLoading(false);
+    }, 1000);
     if (isAdminMode) {
       const storedPassword = localStorage.getItem("adminPassword");
       if (storedPassword === correctPassword) {
@@ -152,7 +155,7 @@ const HomePage = ({ isAdminMode = false }) => {
 
       auth(localStorage.getItem("local_nsec")).then((res) =>
         postNostrContent(
-          `gm nostr! I've joined #LearnWithNostr through https://girlsoncampus.app.`
+          `gm nostr! I've joined using Robots Building Education through https://girlsoncampus.app`
         )
       );
     } else {
@@ -186,10 +189,6 @@ const HomePage = ({ isAdminMode = false }) => {
 
       // const userDoc = await getDoc(userDocRef);
     }
-
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
   };
 
   useEffect(() => {

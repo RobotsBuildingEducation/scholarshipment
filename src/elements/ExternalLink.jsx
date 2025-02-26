@@ -1,4 +1,4 @@
-import { Button, IconButton, useToast } from "@chakra-ui/react";
+import { Box, Button, IconButton, Text, useToast } from "@chakra-ui/react";
 import React, { useState } from "react";
 import { TbLink } from "react-icons/tb";
 import { TbLinkPlus } from "react-icons/tb";
@@ -102,9 +102,19 @@ export const ExternalLink = ({
           {copyIsClicked ? <TbLink color="purple" /> : <TbLink />}
         </IconButton>
       ) : (
-        <IconButton variant="transparent" fontSize={24}>
-          <RxExternalLink />
-        </IconButton>
+        <>
+          <IconButton variant="transparent" fontSize={24}>
+            <RxExternalLink />
+          </IconButton>
+          <Text
+            height="100%"
+            fontSize="sm"
+            display="flex"
+            alignItems={"center"}
+          >
+            Visit website
+          </Text>
+        </>
       )}
       {textDisplay}
     </a>

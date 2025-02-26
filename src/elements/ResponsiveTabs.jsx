@@ -11,6 +11,9 @@ import {
   AccordionIcon,
   useBreakpointValue,
   Box,
+  Select,
+  VStack,
+  HStack,
 } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { HiOutlineBookmark, HiOutlineSparkles } from "react-icons/hi2";
@@ -24,6 +27,11 @@ const ResponsiveTabs = ({
   handleMyScholarshipsClick,
   handleRecommendedClick,
   children,
+
+  loadScholarships,
+  setSelectedCollection,
+  selectedCollection,
+  setIsRenderingSpotlight,
 }) => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -127,15 +135,41 @@ const ResponsiveTabs = ({
         padding="4px"
         borderBottomRadius={"6px"}
       >
-        <Tab onClick={handleViewAllClick}>All</Tab>
-        <Tab textAlign="left" onClick={handleViewSavedClick}>
-          <HiOutlineBookmark />
-          &nbsp; Saved
-        </Tab>
-        <Tab textAlign="left" onClick={handleViewDraftsClick}>
-          <HiOutlineSparkles />
-          &nbsp;Drafts
-        </Tab>
+        <HStack width="100%" maxWidth="606px">
+          <Select
+            border="3px solid #EBE6F8"
+            width="50%"
+            value={selectedCollection}
+            onChange={(e) => {
+              setIsRenderingSpotlight(false);
+
+              setSelectedCollection(e.target.value);
+              // Optionally, reload the list from the newly selected collection.
+              // loadScholarships("all");
+            }}
+          >
+            <option value="scholarships">Scholarships</option>
+            <option value="careers">Career</option>
+          </Select>
+          <HStack width="50%">
+            <Tab onClick={handleViewAllClick}>All</Tab>
+            <Tab
+              textAlign="left"
+              onClick={handleViewSavedClick}
+              // display="flex"
+              // alignItems={"center"}
+            >
+              <HiOutlineBookmark />
+              &nbsp;
+              {/* Saved */}
+            </Tab>
+            <Tab textAlign="left" onClick={handleViewDraftsClick}>
+              <HiOutlineSparkles />
+              &nbsp;
+              {/* Drafts */}
+            </Tab>
+          </HStack>
+        </HStack>
 
         {/* <Tab textAlign="left" onClick={handleMyScholarshipsClick}>
             Preferences

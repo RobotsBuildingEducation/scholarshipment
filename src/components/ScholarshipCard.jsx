@@ -42,7 +42,7 @@ const ScholarshipCard = ({
   removeFromSaved,
   secretMode = false,
 }) => {
-  console.log("secret mode?", secretMode);
+  // console.log("secret mode?", secretMode);
   const toast = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -73,6 +73,8 @@ const ScholarshipCard = ({
     setTimeout(() => setIsSaved(false), 600); // Reset after 2s
   };
 
+  // console.log("scholarshipscholarshipscholarshipscholarship", scholarship);
+
   return (
     <Box
       borderWidth={1}
@@ -94,11 +96,13 @@ const ScholarshipCard = ({
     >
       <div style={{ padding: 18, marginLeft: 12, paddingBottom: 0 }}>
         <h3>{scholarship.name}</h3>
-        <Text style={{ fontWeight: "bold" }} fontSize={"lg"}>
-          {scholarship.amount === 0
-            ? "Scholarship amount varies"
-            : formatAmount(scholarship.amount)}
-        </Text>
+        {scholarship?.collectionType === "careers" ? null : (
+          <Text style={{ fontWeight: "bold" }} fontSize={"lg"}>
+            {scholarship.amount === 0
+              ? "Scholarship amount varies"
+              : formatAmount(scholarship.amount)}
+          </Text>
+        )}
       </div>
       {images.length > 1 ? (
         <Carousel
@@ -208,12 +212,14 @@ const ScholarshipCard = ({
       </div>
 
       <Box p={6} style={{ marginTop: "-4px" }}>
-        <Text>
-          <b>Due Date</b> <br />
-          {scholarship?.dueDate.toLowerCase().includes("error")
-            ? "Not available. Visit website to learn more."
-            : scholarship?.dueDate}
-        </Text>
+        {scholarship?.collectionType === "careers" ? null : (
+          <Text>
+            <b>Due Date</b> <br />
+            {scholarship?.dueDate.toLowerCase().includes("error")
+              ? "Not available. Visit website to learn more."
+              : scholarship?.dueDate}
+          </Text>
+        )}
 
         {scholarship?.eligibility ? (
           <Text>
@@ -234,28 +240,40 @@ const ScholarshipCard = ({
           <b>Major:</b> {scholarship?.major || "-"}
         </Text> */}
 
-        <Accordion allowMultiple>
-          <AccordionItem>
-            <AccordionButton
-              style={{
-                backgroundColor: "transparent",
-              }}
+        {scholarship?.collectionType === "careers" ? (
+          <Text>
+            <b>Details</b>
+            <Markdown
+              // components={ChakraUIRenderer()}
+              children={scholarship?.details || "-"}
+              style={{ fontSize: 12 }}
             >
-              <Box flex="1" textAlign="left">
-                Learn more
-              </Box>
-              <AccordionIcon />
-            </AccordionButton>
-            <AccordionPanel
-              pb={4}
-              style={{
-                backgroundColor: "transparent",
-              }}
-            >
-              {/* <Text>
+              {/* {scholarship?.eligibility} */}
+            </Markdown>
+          </Text>
+        ) : (
+          <Accordion allowMultiple>
+            <AccordionItem>
+              <AccordionButton
+                style={{
+                  backgroundColor: "transparent",
+                }}
+              >
+                <Box flex="1" textAlign="left">
+                  Learn more
+                </Box>
+                <AccordionIcon />
+              </AccordionButton>
+              <AccordionPanel
+                pb={4}
+                style={{
+                  backgroundColor: "transparent",
+                }}
+              >
+                {/* <Text>
                 <b>Ethnicity:</b> {scholarship?.ethnicity || "-"}
               </Text> */}
-              {/* <Text>
+                {/* <Text>
                 <b>Eligibility</b>{" "}
                 <Markdown
                   // components={ChakraUIRenderer()}
@@ -265,19 +283,20 @@ const ScholarshipCard = ({
 
                 </Markdown>
               </Text> */}
-              <Text>
-                <b>Details</b>
-                <Markdown
-                  // components={ChakraUIRenderer()}
-                  children={scholarship?.details || "-"}
-                  style={{ fontSize: 12 }}
-                >
-                  {/* {scholarship?.eligibility} */}
-                </Markdown>
-              </Text>
-            </AccordionPanel>
-          </AccordionItem>
-        </Accordion>
+                <Text>
+                  <b>Details</b>
+                  <Markdown
+                    // components={ChakraUIRenderer()}
+                    children={scholarship?.details || "-"}
+                    style={{ fontSize: 12 }}
+                  >
+                    {/* {scholarship?.eligibility} */}
+                  </Markdown>
+                </Text>
+              </AccordionPanel>
+            </AccordionItem>
+          </Accordion>
+        )}
 
         <br />
         <Box height="100%">
@@ -353,24 +372,26 @@ const ScholarshipCard = ({
           )}
 
           {/* {viewMode !== "drafts" && ( */}
-          <Button
-            onClick={() => {
-              onSend(scholarship);
-              // toast({
-              //   title: "Draft Created.",
-              //   description: "The draft has been created successfully.",
-              //   status: "info",
-              //   duration: 5000,
-              //   isClosable: true,
-              //   position: "top",
-              // });
-            }}
-            mt={2}
-            ml={2}
-          >
-            <HiOutlineSparkles />
-            &nbsp;Draft
-          </Button>
+          {scholarship?.collectionType === "careers" ? null : (
+            <Button
+              onClick={() => {
+                onSend(scholarship);
+                // toast({
+                //   title: "Draft Created.",
+                //   description: "The draft has been created successfully.",
+                //   status: "info",
+                //   duration: 5000,
+                //   isClosable: true,
+                //   position: "top",
+                // });
+              }}
+              mt={2}
+              ml={2}
+            >
+              <HiOutlineSparkles />
+              &nbsp;Draft
+            </Button>
+          )}
           {/* )} */}
         </Box>
         {isAdminMode && (

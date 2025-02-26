@@ -23,6 +23,7 @@ import {
   VStack,
   TagCloseButton,
   Text,
+  Select,
 } from "@chakra-ui/react";
 import ScholarshipBuilder from "../components/ScholarshipBuilder";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -34,6 +35,7 @@ import { useChatCompletion } from "../hooks/useChatCompletion";
 import useDidKeyStore from "../hooks/useDidKeyStore";
 import { useSharedNostr } from "../hooks/useNOSTR";
 import { useNavigate } from "react-router-dom";
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const { auth, postNostrContent } = useSharedNostr(
@@ -45,8 +47,12 @@ const AdminPage = () => {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // NEW: State to track which collection we're creating to
+  const [selectedCollection, setSelectedCollection] = useState("scholarships");
+
   const [formData, setFormData] = useState({
-    collectionType: [],
+    collectionType: selectedCollection,
+
     name: "",
     dueDate: "",
     year: "",
@@ -64,7 +70,7 @@ const AdminPage = () => {
     isInternational: false,
     isStateOnly: false,
     isSpotlight: false,
-    fileURLs: [], // Holds URLs of uploaded files
+    fileURLs: [],
   });
 
   const {
@@ -82,43 +88,172 @@ const AdminPage = () => {
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD;
-
   const [scholarshipWebsiteText, setScholarshipWebsiteText] = useState("");
-
   const [excelMode, setExcelMode] = useState(false);
   const [excelData, setExcelData] = useState([]);
   const [currentRowIndex, setCurrentRowIndex] = useState(0);
-
   const [singleSubmissionMessage, setSingleSubmissionMessage] = useState("");
   const [batchSubmissionMessage, setBatchSubmissionMessage] = useState("");
-
-  console.log("excel data", excelData);
 
   useEffect(() => {
     let getKeys = async () => {
       let keySet = await auth(localStorage.getItem("local_nsec"));
-
       console.log("keysetnpub", keySet);
       if (
         keySet.user.npub ===
-        // "npub14vskcp90k6gwp6sxjs2jwwqpcmahg6wz3h5vzq0yn6crrsq0utts52axlt"
         "npub1ae02dvwewx8w0z2sftpcg2ta4xyu6hc00mxuq03x2aclta6et76q90esq2"
       ) {
         enableSecretMode();
       }
     };
-
     getKeys();
   }, []);
+
+  const mapRowToDocData = (row) => {
+    if (selectedCollection === "careers") {
+      // New CSV mapping for careers
+      const additionalTags = [];
+      const combined = `${row["Requirements/Grade"] || ""} ${
+        row["Information"] || ""
+      }`.toLowerCase();
+
+      if (combined.includes("full ride")) {
+        additionalTags.push("Full ride");
+      }
+      if (combined.includes("rolling")) {
+        additionalTags.push("Rolling");
+      }
+      return {
+        collectionType: selectedCollection,
+        name: row["Summer Programs"] || row["Name"] || "",
+        details: row["Information"] || "",
+        eligibility: row["Requirements/Grade"] || "",
+        link: row["LINK"] || "",
+        dueDate: "", // Not provided in new CSV
+        year: "",
+        major: "",
+        amount: 0,
+        ethnicity: "",
+        meta: "",
+        isHighschool:
+          row["Requirements/Grade"]?.toLowerCase().includes("hs") ||
+          row["For who"]?.toLowerCase().includes("hs") ||
+          false,
+        isCollege:
+          row["Requirements/Grade"]?.toLowerCase().includes("college") ||
+          row["For who"]?.toLowerCase().includes("undergrad") ||
+          false,
+        isUnderserved: false,
+        isInternational:
+          row["Requirements/Grade"]?.toLowerCase().includes("international") ||
+          false,
+        isStateOnly: false,
+        isSpotlight: false,
+        fileURLs: [],
+        tags: additionalTags,
+      };
+    } else {
+      // Legacy CSV mapping (for scholarships or legacy careers)
+      const usedColumns = [
+        "Name",
+        "Date Due",
+        "Immigration status/Eligibility Requirements ",
+        "Race/Ethnicity/Gender",
+        "Amount ",
+        "Description",
+        "Open to ",
+        "link",
+      ];
+      const additionalTags = [];
+      for (const key in row) {
+        if (row[key] && !usedColumns.includes(key)) {
+          if (key.toLocaleLowerCase().includes("full ride")) {
+            additionalTags.push("Full ride");
+          } else if (key.toLocaleLowerCase().includes("rolling")) {
+            additionalTags.push("Rolling");
+          } else {
+            row[key].split(", ").forEach((word) => additionalTags.push(word));
+          }
+        }
+      }
+      const convertDateFormat = (dateStr) => {
+        try {
+          const [month, day, year] = dateStr.split("/");
+          if (
+            !month ||
+            !day ||
+            !year ||
+            isNaN(month) ||
+            isNaN(day) ||
+            isNaN(year)
+          ) {
+            return "";
+          }
+          return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+        } catch (error) {
+          return "";
+        }
+      };
+      return {
+        collectionType: selectedCollection,
+        name: row.Name || "",
+        dueDate: convertDateFormat(row["Date Due"]) || "",
+        year: "",
+        eligibility: row["Immigration status/Eligibility Requirements "] || "",
+        major: "",
+        amount: parseFloat(row["Amount "]?.replace(/[^0-9.-]+/g, "")) || 0,
+        ethnicity: row["Race/Ethnicity/Gender"] || "",
+        link: row.link || "",
+        tags: additionalTags,
+        details: row.Description || "",
+        meta: "",
+        isHighschool:
+          row["Open to "]?.includes("HS") ||
+          row["Open to "]?.includes("below 18") ||
+          row["Open to "]?.includes("18+") ||
+          false,
+        isCollege:
+          row["Open to "]?.includes("College") ||
+          row["Open to "]?.includes("Grad") ||
+          row["Open to "]?.includes("18+") ||
+          false,
+        isUnderserved:
+          row["Immigration status/Eligibility Requirements "]
+            .toLocaleLowerCase()
+            .includes("undocumented") ||
+          row["Immigration status/Eligibility Requirements "]
+            .toLocaleLowerCase()
+            .includes("DACA") ||
+          row["Immigration status/Eligibility Requirements "]
+            .toLocaleLowerCase()
+            .includes("underserved") ||
+          row["Description"].toLocaleLowerCase().includes("undocumented") ||
+          row["Description"].toLocaleLowerCase().includes("DACA") ||
+          row["Description"].toLocaleLowerCase().includes("underserved") ||
+          row["Name"].toLocaleLowerCase().includes("undocumented") ||
+          row["Name"].toLocaleLowerCase().includes("DACA") ||
+          row["Name"].toLocaleLowerCase().includes("underserved") ||
+          false,
+        isInternational:
+          row["Immigration status/Eligibility Requirements "]
+            .toLocaleLowerCase()
+            .includes("international") ||
+          row["Description"].toLocaleLowerCase().includes("international"),
+        isStateOnly: false,
+        isSpotlight: false,
+        fileURLs: [],
+      };
+    }
+  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
 
-    console.log("file", file);
+    console.log("FILE", file);
     Papa.parse(file, {
       header: true,
       complete: (result) => {
-        console.log("result.data", result.data);
+        console.log("RESULT", result);
         setExcelData(result.data);
         setExcelMode(true);
         setCurrentRowIndex(0);
@@ -126,124 +261,156 @@ const AdminPage = () => {
     });
   };
 
+  // Modified populateForm to handle both new CSV columns and legacy ones
   const populateForm = (row) => {
-    const usedColumns = [
-      "Name",
-      "Date Due",
-      "Immigration status/Eligibility Requirements ",
-      "Race/Ethnicity/Gender",
-      "Amount ",
-      "Description",
-      "Open to ",
-      "link",
-    ];
-    const additionalTags = [];
+    // Check for new CSV column "Summer Programs"
+    if (selectedCollection === "careers") {
+      // Map new CSV columns to formData keys
+      // New CSV mapping for careers
+      const additionalTags = [];
+      const combined = `${row["Requirements/Grade"] || ""} ${
+        row["Information"] || ""
+      }`.toLowerCase();
 
-    // Iterate through all columns in the row
-    for (const key in row) {
-      if (row[key] && !usedColumns.includes(key)) {
-        if (key.toLocaleLowerCase().includes("full ride")) {
-          additionalTags.push(`Full ride`);
-        } else if (key.toLocaleLowerCase().includes("rolling")) {
-          additionalTags.push(`Rolling`);
-        } else {
-          let data = row[key].split(", ");
-          data.forEach((word) => {
-            additionalTags.push(word);
-          });
+      if (combined.includes("full ride")) {
+        additionalTags.push("Full ride");
+      }
+      if (combined.includes("rolling")) {
+        additionalTags.push("Rolling");
+      }
+      setFormData({
+        collectionType: selectedCollection,
+        name: row["Summer Programs"] || row["Name"] || "",
+        details: row["Information"] || "",
+        eligibility: row["Requirements/Grade"] || "",
+        link: row["LINK"] || "",
+        dueDate: "", // Not provided in new CSV
+        year: "",
+        major: "",
+        amount: 0,
+        ethnicity: "",
+        meta: "",
+        isHighschool:
+          row["Requirements/Grade"]?.toLowerCase().includes("hs") ||
+          row["For who"]?.toLowerCase().includes("hs") ||
+          false,
+        isCollege:
+          row["Requirements/Grade"]?.toLowerCase().includes("college") ||
+          row["For who"]?.toLowerCase().includes("undergrad") ||
+          false,
+        isUnderserved: false,
+        isInternational:
+          row["Requirements/Grade"]?.toLowerCase().includes("international") ||
+          false,
+        isStateOnly: false,
+        isSpotlight: false,
+        fileURLs: [],
+        tags: additionalTags,
+      });
+    } else {
+      // Legacy CSV columns mapping
+      const usedColumns = [
+        "Name",
+        "Date Due",
+        "Immigration status/Eligibility Requirements ",
+        "Race/Ethnicity/Gender",
+        "Amount ",
+        "Description",
+        "Open to ",
+        "link",
+      ];
+      const additionalTags = [];
+      for (const key in row) {
+        if (row[key] && !usedColumns.includes(key)) {
+          if (key.toLocaleLowerCase().includes("full ride")) {
+            additionalTags.push("Full ride");
+          } else if (key.toLocaleLowerCase().includes("rolling")) {
+            additionalTags.push("Rolling");
+          } else {
+            let data = row[key].split(", ");
+            data.forEach((word) => {
+              additionalTags.push(word);
+            });
+          }
         }
       }
+      let convertDateFormat = (dateStr) => {
+        try {
+          const [month, day, year] = dateStr.split("/");
+          if (
+            !month ||
+            !day ||
+            !year ||
+            isNaN(month) ||
+            isNaN(day) ||
+            isNaN(year)
+          ) {
+            throw new Error("Invalid date format");
+          }
+          return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+        } catch (error) {
+          return `Error: ${error.message}`;
+        }
+      };
+      setFormData({
+        collectionType: selectedCollection,
+
+        name: row.Name || "",
+        dueDate: convertDateFormat(row["Date Due"]) || "",
+        year: "",
+        eligibility: row["Immigration status/Eligibility Requirements "] || "",
+        major: "",
+        amount: parseFloat(row["Amount "].replace(/[^0-9.-]+/g, "")) || 0,
+        ethnicity: row["Race/Ethnicity/Gender"] || "",
+        link: row.link || "",
+        tags: additionalTags || [],
+        details: row.Description || "",
+        meta: "",
+        isHighschool:
+          row["Open to "]?.includes("HS") ||
+          row["Open to "]?.includes("below 18") ||
+          row["Open to "]?.includes("18+") ||
+          false,
+        isCollege:
+          row["Open to "]?.includes("College") ||
+          row["Open to "]?.includes("Grad") ||
+          row["Open to "]?.includes("18+") ||
+          false,
+        isUnderserved:
+          row["Immigration status/Eligibility Requirements "]
+            .toLocaleLowerCase()
+            .includes("undocumented") ||
+          row["Immigration status/Eligibility Requirements "]
+            .toLocaleLowerCase()
+            .includes("DACA") ||
+          row["Immigration status/Eligibility Requirements "]
+            .toLocaleLowerCase()
+            .includes("underserved") ||
+          row["Description"].toLocaleLowerCase().includes("undocumented") ||
+          row["Description"].toLocaleLowerCase().includes("DACA") ||
+          row["Description"].toLocaleLowerCase().includes("underserved") ||
+          row["Name"].toLocaleLowerCase().includes("undocumented") ||
+          row["Name"].toLocaleLowerCase().includes("DACA") ||
+          row["Name"].toLocaleLowerCase().includes("underserved") ||
+          false,
+        isInternational:
+          row["Immigration status/Eligibility Requirements "]
+            .toLocaleLowerCase()
+            .includes("international") ||
+          row["Description"].toLocaleLowerCase().includes("international"),
+        isStateOnly: false,
+        isSpotlight: false,
+        fileURLs: [],
+      });
     }
-
-    let convertDateFormat = (dateStr) => {
-      try {
-        // Split the input date string by "/"
-        const [month, day, year] = dateStr.split("/");
-
-        // Check if the input is valid
-        if (
-          !month ||
-          !day ||
-          !year ||
-          isNaN(month) ||
-          isNaN(day) ||
-          isNaN(year)
-        ) {
-          throw new Error("Invalid date format");
-        }
-
-        // Ensure proper formatting with leading zeros
-        const formattedMonth = month.padStart(2, "0");
-        const formattedDay = day.padStart(2, "0");
-
-        // Return the date in YYYY-MM-DD format
-        return `${year}-${formattedMonth}-${formattedDay}`;
-      } catch (error) {
-        return `Error: ${error.message}`;
-      }
-    };
-    setFormData({
-      name: row.Name || "",
-      dueDate: convertDateFormat(row["Date Due"]) || "",
-      year: "", // Adjust as needed
-      eligibility: row["Immigration status/Eligibility Requirements "] || "",
-      major: "", // Not present in the dataset
-      amount: parseFloat(row["Amount "].replace(/[^0-9.-]+/g, "")) || 0,
-      ethnicity: row["Race/Ethnicity/Gender"] || "",
-      link: row.link || "",
-      tags: additionalTags || [], // Adjust as needed
-      details: row.Description || "",
-      meta: "",
-      isHighschool:
-        row["Open to "]?.includes("HS") ||
-        row["Open to "]?.includes("below 18") ||
-        row["Open to "]?.includes("18+") ||
-        false,
-      isCollege:
-        row["Open to "]?.includes("College") ||
-        row["Open to "]?.includes("Grad") ||
-        row["Open to "]?.includes("18+") ||
-        false,
-      isUnderserved:
-        row["Immigration status/Eligibility Requirements "]
-          .toLocaleLowerCase()
-          .includes("undocumented") ||
-        row["Immigration status/Eligibility Requirements "]
-          .toLocaleLowerCase()
-          .includes("DACA") ||
-        row["Immigration status/Eligibility Requirements "]
-          .toLocaleLowerCase()
-          .includes("underserved") ||
-        row["Description"].toLocaleLowerCase().includes("undocumented") ||
-        row["Description"].toLocaleLowerCase().includes("DACA") ||
-        row["Description"].toLocaleLowerCase().includes("underserved") ||
-        row["Name"].toLocaleLowerCase().includes("undocumented") ||
-        row["Name"].toLocaleLowerCase().includes("DACA") ||
-        row["Name"].toLocaleLowerCase().includes("underserved") ||
-        false,
-      isInternational:
-        row["Immigration status/Eligibility Requirements "]
-          .toLocaleLowerCase()
-          .includes("international") ||
-        row["Description"].toLocaleLowerCase().includes("international"),
-      isStateOnly: false,
-      isSpotlight: false,
-      fileURLs: [],
-    });
   };
 
   useEffect(() => {
-    console.log("messages", messages);
     if (messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
-    // If streaming done, parse JSON from lastMsg.content
     if (lastMsg?.meta?.done) {
-      console.log("done");
       try {
-        console.log("lst", lastMsg);
-
         const parsed = JSON.parse(lastMsg.content.trim() || "{}");
-        console.log("parsed", parsed);
         setFormData((prev) => ({
           ...prev,
           name: parsed.name || prev.name,
@@ -277,8 +444,6 @@ const AdminPage = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-
-    console.log("value", value);
     setFormData((prevData) => ({
       ...prevData,
       [name]: type === "checkbox" ? checked : value,
@@ -317,8 +482,6 @@ const AdminPage = () => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
       setFiles(newFiles);
-
-      // Generate preview URLs for the selected files
       const fileURLs = newFiles.map((file) => URL.createObjectURL(file));
       setFormData((prevData) => ({
         ...prevData,
@@ -327,17 +490,12 @@ const AdminPage = () => {
     }
   };
 
-  const handleUpload = async (scholarshipId) => {
+  const handleUpload = async (docId) => {
     if (files.length === 0) return [];
-
     const uploadPromises = files.map((file) => {
       return new Promise((resolve, reject) => {
-        const storageRef = ref(
-          storage,
-          `uploads/${scholarshipId}/${file.name}`
-        );
+        const storageRef = ref(storage, `uploads/${docId}/${file.name}`);
         const uploadTask = uploadBytesResumable(storageRef, file);
-
         uploadTask.on(
           "state_changed",
           (snapshot) => {
@@ -358,7 +516,6 @@ const AdminPage = () => {
         );
       });
     });
-
     try {
       const urls = await Promise.all(uploadPromises);
       setFormData((prevData) => ({
@@ -377,31 +534,34 @@ const AdminPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSingleSubmissionMessage(""); // clear old message
-
+    setSingleSubmissionMessage("");
     try {
-      const scholarshipRef = await addDoc(
-        collection(database, "scholarships"),
-        {
-          ...formData,
-          fileURLs: [], // Temporarily empty, will be updated later
-        }
-      );
-      const scholarshipId = scholarshipRef.id;
-
+      // Use the selectedCollection here instead of hardcoding "scholarships"
+      const docRef = await addDoc(collection(database, selectedCollection), {
+        ...formData,
+        fileURLs: [],
+      });
+      const docId = docRef.id;
       if (formData.name && formData.dueDate !== "Error: Invalid date format") {
+        // Adjust the post message based on the selected collection
         postNostrContent(
-          `Just published a new scholarship! View it at https://girlsoncampus.app/${scholarshipId} & learn more about the ${formData.name} scholarship due ${formData.dueDate}. \n\n #LearnWithNostr`
+          `Just published a new ${
+            selectedCollection === "scholarships" ? "scholarship" : "career"
+          }! View it at https://girlsoncampus.app/${docId} & learn more about the ${
+            formData.name
+          } ${
+            selectedCollection === "scholarships" ? "scholarship" : "career"
+          } due ${formData.dueDate}. \n\n #LearnWithNostr`
         );
       }
-      const fileUploadResult = await handleUpload(scholarshipId);
-
-      await updateDoc(doc(database, "scholarships", scholarshipId), {
+      const fileUploadResult = await handleUpload(docId);
+      await updateDoc(doc(database, selectedCollection, docId), {
         fileURLs: fileUploadResult,
       });
-
       setSingleSubmissionMessage(
-        `Scholarship published successfully: ${formData.name}`
+        `${
+          selectedCollection === "scholarships" ? "Scholarship" : "Career"
+        } published successfully: ${formData.name}`
       );
       if (excelMode && currentRowIndex < excelData.length - 1) {
         setCurrentRowIndex((prevIndex) => prevIndex + 1);
@@ -410,7 +570,6 @@ const AdminPage = () => {
         setExcelMode(false);
       } else {
         setFormData({
-          collectionType: [],
           name: "",
           dueDate: "",
           year: "",
@@ -429,12 +588,13 @@ const AdminPage = () => {
           isStateOnly: false,
           isSpotlight: false,
           fileURLs: [],
+          collectionType: selectedCollection,
         });
       }
       setFiles([]);
     } catch (error) {
       console.error("Error adding document: ", error);
-      setSingleSubmissionMessage("Error publishing scholarship.");
+      setSingleSubmissionMessage("Error publishing document.");
     }
   };
 
@@ -453,23 +613,14 @@ const AdminPage = () => {
 
   const handleLogin = async () => {
     setIsAuthenticating(true);
-    setErrorMessage(""); // Clear any previous errors
-
+    setErrorMessage("");
     try {
-      // Assume `auth` is a function to validate the key
-      const result = await auth(secretKeyInput); // Replace with your actual validation logic
+      const result = await auth(secretKeyInput);
       if (
         result.user.npub ===
         "npub1ae02dvwewx8w0z2sftpcg2ta4xyu6hc00mxuq03x2aclta6et76q90esq2"
       ) {
-        enableSecretMode(); // Enable Secret Mode
-        toast({
-          title: "Secret Mode Enabled",
-          description: "You have successfully entered Secret Mode.",
-          status: "success",
-          duration: 3000,
-          isClosable: true,
-        });
+        enableSecretMode();
       } else {
         setErrorMessage("Invalid Secret Key.");
       }
@@ -477,7 +628,6 @@ const AdminPage = () => {
       setErrorMessage("An error occurred. Please try again.");
       console.error("Secret Key Validation Error:", error);
     }
-
     setIsAuthenticating(false);
   };
 
@@ -507,174 +657,77 @@ const AdminPage = () => {
       The user's text is:
       """${scholarshipWebsiteText}"""
     `;
-
-    // We use the hook’s submitPrompt function with an array of messages:
     submitPrompt([{ role: "user", content: prompt }]);
   };
 
   const handleSubmitAll = async () => {
     setBatchSubmissionMessage("");
-    if (!excelMode || excelData.length === 0) {
-      return;
-    }
-
+    if (!excelMode || excelData.length === 0) return;
     let successCount = 0;
-
     for (let i = 0; i < excelData.length; i++) {
       const row = excelData[i];
       try {
-        // Convert row directly into a doc object, similar to `populateForm`.
-        const usedColumns = [
-          "Name",
-          "Date Due",
-          "Immigration status/Eligibility Requirements ",
-          "Race/Ethnicity/Gender",
-          "Amount ",
-          "Description",
-          "Open to ",
-          "link",
-        ];
-        const additionalTags = [];
-
-        for (const key in row) {
-          if (row[key] && !usedColumns.includes(key)) {
-            if (key.toLocaleLowerCase().includes("full ride")) {
-              additionalTags.push("Full ride");
-            } else if (key.toLocaleLowerCase().includes("rolling")) {
-              additionalTags.push("Rolling");
-            } else {
-              const data = row[key].split(", ");
-              data.forEach((word) => {
-                additionalTags.push(word);
-              });
-            }
-          }
-        }
-
-        const convertDateFormat = (dateStr) => {
-          try {
-            const [month, day, year] = dateStr.split("/");
-            if (
-              !month ||
-              !day ||
-              !year ||
-              isNaN(month) ||
-              isNaN(day) ||
-              isNaN(year)
-            )
-              return "";
-            return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-          } catch (error) {
-            return "";
-          }
-        };
-
-        // Build doc data
-        const rowDocData = {
-          name: row.Name || "",
-          dueDate: convertDateFormat(row["Date Due"]) || "",
-          year: "",
-          eligibility:
-            row["Immigration status/Eligibility Requirements "] || "",
-          major: "",
-          amount: parseFloat(row["Amount "]?.replace(/[^0-9.-]+/g, "")) || 0,
-          ethnicity: row["Race/Ethnicity/Gender"] || "",
-          link: row.link || "",
-          tags: additionalTags,
-          details: row.Description || "",
-          meta: "",
-          isHighschool:
-            row["Open to "]?.includes("HS") ||
-            row["Open to "]?.includes("below 18") ||
-            row["Open to "]?.includes("18+") ||
-            false,
-          isCollege:
-            row["Open to "]?.includes("College") ||
-            row["Open to "]?.includes("Grad") ||
-            row["Open to "]?.includes("18+") ||
-            false,
-          isUnderserved:
-            row["Immigration status/Eligibility Requirements "]
-              .toLocaleLowerCase()
-              .includes("undocumented") ||
-            row["Immigration status/Eligibility Requirements "]
-              .toLocaleLowerCase()
-              .includes("DACA") ||
-            row["Immigration status/Eligibility Requirements "]
-              .toLocaleLowerCase()
-              .includes("underserved") ||
-            row["Description"].toLocaleLowerCase().includes("undocumented") ||
-            row["Description"].toLocaleLowerCase().includes("DACA") ||
-            row["Description"].toLocaleLowerCase().includes("underserved") ||
-            row["Name"].toLocaleLowerCase().includes("undocumented") ||
-            row["Name"].toLocaleLowerCase().includes("DACA") ||
-            row["Name"].toLocaleLowerCase().includes("underserved") ||
-            false,
-          isInternational:
-            row["Immigration status/Eligibility Requirements "]
-              .toLocaleLowerCase()
-              .includes("international") ||
-            row["Description"].toLocaleLowerCase().includes("international"),
-          isStateOnly: false,
-          isSpotlight: false,
-          fileURLs: [],
-        };
-
-        // Create doc
-        const scholarshipRef = await addDoc(
-          collection(database, "scholarships"),
+        const rowDocData = mapRowToDocData(row);
+        const docRef = await addDoc(
+          collection(database, selectedCollection),
           rowDocData
         );
-        const scholarshipId = scholarshipRef.id;
-
-        // Optional: Post on Nostr
+        const docId = docRef.id;
         postNostrContent(
-          `Just published a new scholarship! View it at https://girlsoncampus.app/${scholarshipId} & learn more about the ${rowDocData.name} scholarship due ${rowDocData.dueDate}. \n\n #LearnWithNostr`
+          `Just published a new ${
+            selectedCollection === "scholarships" ? "scholarship" : "career"
+          }! View it at https://girlsoncampus.app/${docId} & learn more about the ${
+            rowDocData.name
+          } ${
+            selectedCollection === "scholarships" ? "scholarship" : "career"
+          } due ${rowDocData.dueDate}. \n\n #LearnWithNostr`
         );
-
-        // If you want to upload the same files for *every* row, uncomment:
-        /*
-        const fileUploadResult = await handleUpload(scholarshipId);
-        await updateDoc(doc(database, "scholarships", scholarshipId), {
-          fileURLs: fileUploadResult,
-        });
-        */
-
         successCount++;
       } catch (error) {
-        console.error("Error adding scholarship from row:", error);
-        // Continue to next row
+        console.error("Error adding document from row:", error);
       }
     }
-
     setBatchSubmissionMessage(
-      `Successfully submitted ${successCount} scholarship(s) out of ${excelData.length}.`
+      `Successfully submitted ${successCount} document(s) out of ${excelData.length}.`
     );
-    // Optionally turn off Excel mode after batch submission:
     setExcelMode(false);
   };
 
-  console.log("FORM DATA FINaL", formData);
+  console.log("tttttt", formData);
 
   if (secretMode) {
     return (
       <Container>
         <Box mt={8} mb={8}>
-          <Button boxShadow="0.5px 0.5px 1px 0px" onClick={() => navigate("/")}>
+          <Button onClick={() => navigate("/")} boxShadow="0.5px 0.5px 1px 0px">
             Back to app
           </Button>
           &nbsp;&nbsp;&nbsp;
           <Button
-            boxShadow="0.5px 0.5px 1px 0px"
             onClick={() => navigate("/edit")}
+            boxShadow="0.5px 0.5px 1px 0px"
           >
             Back to edit mode
           </Button>
         </Box>
+        {/* NEW: Dropdown to select the target collection */}
+        <Box mb={4}>
+          <Select
+            border="3px solid skyblue"
+            value={selectedCollection}
+            onChange={(e) => {
+              setSelectedCollection(e.target.value);
+              setFormData({ ...formData, collectionType: e.target.value });
+            }}
+          >
+            <option value="scholarships">Scholarships</option>
+            <option value="careers">Careers</option>
+          </Select>
+        </Box>
         <Box>
           <Heading as="h2" size="xl" mb={4}>
-            Create Scholarship
-            {/* {excelMode ? "Excel Mode: Data Entry" : "Create Scholarship"} */}
+            Create{" "}
+            {selectedCollection === "scholarships" ? "Scholarship" : "Career"}
           </Heading>
 
           <FormControl mb={4}>
@@ -683,9 +736,8 @@ const AdminPage = () => {
               Copy and paste the content from the website or platform so AI can
               fill out the form
             </Text>
-
             <Textarea
-              placeholder="Paste scholarship text from the website here..."
+              placeholder="Paste text from the website here..."
               value={scholarshipWebsiteText}
               onChange={(e) => setScholarshipWebsiteText(e.target.value)}
               rows={6}
@@ -702,19 +754,16 @@ const AdminPage = () => {
           </FormControl>
           <br />
           <br />
-
           {!excelMode && (
             <FormControl mb={4}>
               <FormLabel>Upload CSV for Excel Mode (optional)</FormLabel>
               <Text fontSize="sm">
-                Excel mode will create a scholarship for each row. You'll need
-                to optionally verify and publish each scholarship after
-                uploading.
+                Excel mode will create a document for each row. You'll need to
+                optionally verify and publish each after uploading.
               </Text>
               <Input type="file" onChange={handleFileUpload} />
             </FormControl>
           )}
-
           {excelMode && excelData.length > 0 && (
             <>
               <Text fontSize="md" mb={2}>
@@ -734,17 +783,15 @@ const AdminPage = () => {
           <br />
           <br />
           <Heading as="h2" size="xl" mb={4}>
-            Create Scholarship
+            Create{" "}
+            {selectedCollection === "scholarships" ? "Scholarship" : "Career"}
           </Heading>
+          <Text>Fields are optional</Text>
           <Checkbox
             name="isSpotlight"
             isChecked={formData.isSpotlight}
             onChange={handleChange}
-            sx={{
-              "& .chakra-checkbox__control": {
-                borderColor: "black",
-              },
-            }}
+            sx={{ "& .chakra-checkbox__control": { borderColor: "black" } }}
           >
             Spotlight
           </Checkbox>
@@ -753,7 +800,6 @@ const AdminPage = () => {
           <Grid templateColumns="repeat(2, 1fr)" gap={4}>
             <GridItem colSpan={2}>
               <FormLabel htmlFor="name">Name</FormLabel>
-
               <Input
                 style={{ border: "1px solid black" }}
                 placeholder="Name"
@@ -765,7 +811,6 @@ const AdminPage = () => {
             </GridItem>
             <GridItem colSpan={2}>
               <FormLabel htmlFor="link">Link</FormLabel>
-
               <Input
                 style={{ border: "1px solid black" }}
                 placeholder="Link"
@@ -799,7 +844,6 @@ const AdminPage = () => {
             </GridItem>
             <GridItem colSpan={1}>
               <FormLabel htmlFor="dueDate">Due Date</FormLabel>
-
               <Input
                 style={{ border: "1px solid black" }}
                 placeholder="Due Date"
@@ -812,7 +856,6 @@ const AdminPage = () => {
             </GridItem>
             <GridItem colSpan={1}>
               <FormLabel htmlFor="year">Year</FormLabel>
-
               <Input
                 id="year"
                 style={{ border: "1px solid black" }}
@@ -822,10 +865,8 @@ const AdminPage = () => {
                 onChange={handleChange}
               />
             </GridItem>
-
             <GridItem colSpan={2}>
               <FormLabel htmlFor="eligibility">Eligibility</FormLabel>
-
               <Textarea
                 style={{ border: "1px solid black" }}
                 placeholder="Eligibility"
@@ -834,18 +875,6 @@ const AdminPage = () => {
                 onChange={handleChange}
               />
             </GridItem>
-            {/* <GridItem colSpan={1}>
-            <FormLabel htmlFor="eligibility">Eligibility</FormLabel>
-
-              <Input
-                style={{ border: "1px solid black" }}
-                placeholder="Ethnicity"
-                name="ethnicity"
-                value={formData.ethnicity}
-                onChange={handleChange}
-              />
-            </GridItem> */}
-
             <GridItem colSpan={2}>
               <FormLabel htmlFor="details">Details</FormLabel>
               <Textarea
@@ -865,14 +894,12 @@ const AdminPage = () => {
                   name="meta"
                   value={formData.meta}
                   onChange={handleChange}
-                  placeholder="Copy & content about the resource to inform the AI when users ask to generate content"
+                  placeholder="Additional context for the AI"
                 />
               </FormControl>
             </GridItem>
-
             <GridItem colSpan={2}>
               <FormLabel htmlFor="tags">Tags</FormLabel>
-
               <VStack align="start">
                 <Checkbox
                   name="isHighschool"
@@ -880,9 +907,7 @@ const AdminPage = () => {
                   onChange={handleChange}
                   colorScheme="purple"
                   sx={{
-                    "& .chakra-checkbox__control": {
-                      borderColor: "black",
-                    },
+                    "& .chakra-checkbox__control": { borderColor: "black" },
                   }}
                 >
                   High School
@@ -892,9 +917,7 @@ const AdminPage = () => {
                   isChecked={formData.isCollege}
                   onChange={handleChange}
                   sx={{
-                    "& .chakra-checkbox__control": {
-                      borderColor: "black",
-                    },
+                    "& .chakra-checkbox__control": { borderColor: "black" },
                   }}
                 >
                   College
@@ -904,9 +927,7 @@ const AdminPage = () => {
                   isChecked={formData.isUnderserved}
                   onChange={handleChange}
                   sx={{
-                    "& .chakra-checkbox__control": {
-                      borderColor: "black",
-                    },
+                    "& .chakra-checkbox__control": { borderColor: "black" },
                   }}
                 >
                   Underserved
@@ -916,9 +937,7 @@ const AdminPage = () => {
                   isChecked={formData.isInternational}
                   onChange={handleChange}
                   sx={{
-                    "& .chakra-checkbox__control": {
-                      borderColor: "black",
-                    },
+                    "& .chakra-checkbox__control": { borderColor: "black" },
                   }}
                 >
                   International
@@ -928,9 +947,7 @@ const AdminPage = () => {
                   isChecked={formData.isStateOnly}
                   onChange={handleChange}
                   sx={{
-                    "& .chakra-checkbox__control": {
-                      borderColor: "black",
-                    },
+                    "& .chakra-checkbox__control": { borderColor: "black" },
                   }}
                 >
                   State Only
@@ -939,7 +956,6 @@ const AdminPage = () => {
             </GridItem>
             <GridItem colSpan={2}>
               <FormLabel htmlFor="tags">Custom Tags</FormLabel>
-
               <Input
                 id="tags"
                 style={{ border: "1px solid black" }}
@@ -966,7 +982,6 @@ const AdminPage = () => {
                 ))}
               </Wrap>
             </GridItem>
-
             <GridItem colSpan={2}>
               <FormControl>
                 <FormLabel>Upload Files</FormLabel>
@@ -974,48 +989,30 @@ const AdminPage = () => {
                   type="file"
                   onChange={handleFileChange}
                   multiple
-                  style={{
-                    border: "1px solid transparent",
-                  }}
+                  style={{ border: "1px solid transparent" }}
                 />
                 <div>{progress > 0 && `Upload is ${progress}% done`}</div>
                 {error && <div>Error: {error}</div>}
               </FormControl>
             </GridItem>
-            <br />
           </Grid>
           <br />
           <br />
-          {/* <Box flex="1" textAlign="left">
-            Preview Scholarship
-          </Box> */}
           <ScholarshipBuilder formData={formData} />
-          {/* <Accordion allowToggle mt={4} style={{ border: "1px solid gray" }}>
-            <AccordionItem>
-              <AccordionButton>
-                <Box flex="1" textAlign="left">
-                  Preview Scholarship
-                </Box>
-                <AccordionIcon />
-              </AccordionButton>
-              <AccordionPanel pb={4}>
-                <ScholarshipBuilder formData={formData} />
-              </AccordionPanel>
-            </AccordionItem>
-          </Accordion> */}
           <br />
           <br />
-          {/* <Button onClick={handleSubmit} colorScheme="teal" mt={4}>
-            Publish Scholarship
-          </Button> */}
-
           <Button
             type="submit"
             colorScheme="teal"
             mt={4}
             onClick={handleSubmit}
           >
-            {excelMode ? "Submit and Next" : "Publish Scholarship"}
+            {excelMode
+              ? "Submit and Next"
+              : "Publish " +
+                (selectedCollection === "scholarships"
+                  ? "Scholarship"
+                  : "Career")}
           </Button>
           {singleSubmissionMessage && (
             <Text color="green.600" mt={2}>
@@ -1023,10 +1020,6 @@ const AdminPage = () => {
             </Text>
           )}
         </Box>
-        <br />
-        <br />
-        <br />
-        <br />
         <br />
         <br />
       </Container>
