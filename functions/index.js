@@ -144,4 +144,72 @@ app.post("/generate", verifyAppCheckToken, async (req, res) => {
   }
 });
 
+app.post("/websearch", verifyAppCheckToken, async (req, res) => {
+  try {
+    // Extract properties from the request body
+    // Use 'input' for the main content (string or array) and optionally include other parameters.
+    const { model, input, tools, ...rest } = req.body;
+
+    // Optionally check input length if input is a string (or sum over an array)
+    const maxCharacterLimit = 25000;
+    let inputLength = 0;
+    if (typeof input === "string") {
+      inputLength = input.length;
+    } else if (Array.isArray(input)) {
+      inputLength = input.reduce(
+        (total, item) => total + (typeof item === "string" ? item.length : 0),
+        0
+      );
+    }
+    if (inputLength > maxCharacterLimit) {
+      return res.status(400).send({
+        error: `Input exceeds the limit of ${maxCharacterLimit} characters.`,
+      });
+    }
+
+    // Build the payload for the Responses API.
+    // Default to using the web_search_preview tool if not provided.
+    const payload = {
+      model: model || "gpt-4o",
+      input: input,
+      tools: tools || [
+        {
+          type: "web_search_preview",
+          // You can add additional tool options like search_context_size or user_location here.
+        },
+      ],
+      ...rest,
+    };
+
+    // Make the OpenAI API call using node-fetch
+    const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (openaiResponse.status === 429) {
+      const retryAfter = openaiResponse.headers.get("Retry-After") || "300";
+      res.setHeader("Retry-After", retryAfter);
+      return res.status(429).send({
+        error: "Rate limit exceeded.",
+        retryAfter: retryAfter,
+      });
+    }
+
+    if (!openaiResponse.ok) {
+      throw new Error(`OpenAI API error: ${openaiResponse.statusText}`);
+    }
+
+    const openaiData = await openaiResponse.json();
+    res.status(200).json(openaiData);
+  } catch (error) {
+    console.error("Error generating websearch response:", error);
+    res.status(500).send({ error: error.message });
+  }
+});
+
 exports.app = functions.https.onRequest(app);

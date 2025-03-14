@@ -46,6 +46,7 @@ import {
   SliderTrack,
   SliderThumb,
   Select,
+  Text,
 } from "@chakra-ui/react";
 
 import { useChatCompletion } from "../hooks/useChatCompletion";
@@ -67,6 +68,11 @@ import { useSimpleGeminiChat } from "../hooks/useGeminiChat";
 import { InstallAppModal } from "./InstallModal";
 import { TbFilterSearch } from "react-icons/tb";
 import { IoAppsOutline } from "react-icons/io5";
+import { LuDownload } from "react-icons/lu";
+import { LoanInfoModal } from "./LoanInfoModal";
+import { IoIosInformationCircleOutline } from "react-icons/io";
+import { FaInfoCircle } from "react-icons/fa";
+import { ScholarshipSearchModal } from "./ScholarshipSearchModal";
 
 // import logo_transparent from "../assets/logo_transparent.png";
 
@@ -100,6 +106,12 @@ const Feed = ({ setDidKey, didKey, isAdminMode }) => {
     isOpen: isInstallModalOpen,
     onOpen: onInstallModalOpen,
     onClose: onInstallModalClose,
+  } = useDisclosure();
+
+  const {
+    isOpen: isLoanInfoModalOpen,
+    onOpen: onLoanInfoOpen,
+    onClose: onLoanInfoClose,
   } = useDisclosure();
 
   const {
@@ -391,12 +403,11 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
         const recommendedIds = JSON.parse(
           transformedMessages[transformedMessages.length - 1].content
         ).response.suggested;
-        console.log("RECC", recommendedIds);
+
         const recommendedList = scholarships.filter((sch) =>
           recommendedIds.includes(sch.id)
         );
 
-        console.log("recommendedList", recommendedList);
         setRecommendedScholarships(recommendedList);
 
         setIsFetchingUserData(false);
@@ -408,11 +419,24 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
     // If we have no scholarships loaded yet, just skip
     // if (!scholarships || scholarships.length === 0) return;
 
+    setIsControlFilterActive(false);
+    clearFilters();
+
+    if (
+      (isRenderingSpotlight && searchQuery.length > 0) ||
+      viewMode === "drafts" ||
+      viewMode === "saved"
+    ) {
+      setIsRenderingSpotlight(false);
+      setViewMode("all");
+    }
+
     if (searchQuery.trim() && searchQuery.length > 0) {
       // 1) Global search: search across ALL scholarships, ignoring viewMode & filters
       const lowerQuery = searchQuery.toLowerCase();
       const results = allScholarships.filter((sch) => {
         // console.log("filtering scholarship...", json.stringify)
+
         return JSON.stringify(sch).toLowerCase().includes(lowerQuery);
       });
 
@@ -460,7 +484,6 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
       setIsRenderingSpotlight(false);
     }
 
-    console.log("ALL SCHOLLARS", allScholarships);
     if (allScholarships.length < 1 || isCollectionSwitch) {
       try {
         // const q = query(collection(database, "scholarships"));
@@ -494,11 +517,10 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
         // but you *still* keep the entire dataset in `allScholarships`
 
         if (view === "spotlight") {
-          console.log("loadedScholarships LENGTH", loadedScholarships.length);
-
-          setFilteredScholarships(
-            loadedScholarships.filter((sch) => sch.isSpotlight)
+          let spotlightScholarships = loadedScholarships.filter(
+            (sch) => sch.isSpotlight
           );
+          setFilteredScholarships(spotlightScholarships);
 
           for (const expScholarship of expired) {
             // Copy to "archivedScholarships"
@@ -522,6 +544,11 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
             );
             await deleteDoc(originalRef);
           }
+
+          if (spotlightScholarships.length === 0) {
+            setIsRenderingSpotlight(false);
+            setViewMode("all");
+          }
         } else {
           setFilteredScholarships(loadedScholarships);
         }
@@ -543,6 +570,7 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
 
   const filterScholarships = () => {
     setIsRenderingSpotlight(false);
+
     const filtered = scholarships.filter((scholarship) => {
       return (
         (filters?.collectionType?.length === 0 ||
@@ -579,8 +607,6 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           name: name,
           email: email,
         });
-
-        console.log("Settings saved successfully!");
       } else {
         console.log("No unique ID found. Cannot save settings.");
       }
@@ -612,7 +638,6 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           ...scholarship,
           dateSaved: serverTimestamp(), // Store a server-generated timestamp
         });
-        console.log("Scholarship saved successfully!");
       } catch (error) {
         console.log("Error saving scholarship:", error);
       }
@@ -663,8 +688,6 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
             prev.filter((sch) => sch.id !== scholarship.id)
           );
         }
-
-        console.log("Scholarship removed from saved collection!");
       } catch (error) {
         console.log("Error removing scholarship from saved:", error);
       }
@@ -779,7 +802,7 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           ...selectedScholarship,
           formText,
         });
-        console.log("Form submitted and scholarship saved:", formText);
+
         onAiDrawerClose();
       } catch (error) {
         console.log("Error submitting form:", error);
@@ -816,7 +839,6 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
 
     setIsRenderingSpotlight(false);
     if (allScholarships.length < 1) {
-      console.log("running xyz......");
       loadScholarships("all");
     } else {
       // setFilteredScholarships(allScholarships);
@@ -856,43 +878,97 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
   };
 
   const applyFilters = () => {
-    let filtered = allScholarships;
-
-    // Filter by scholarship amount (if scholarship.amount exists)
-    filtered = filtered.filter((scholarship) => {
-      const amount = scholarship.amount || 0;
-      return amount <= filters.amount;
-    });
-
-    // Filter by boolean flags – if the filter value is false, we don't filter out; if it's true, then we only pass scholarships that are true.
-    filtered = filtered.filter((scholarship) => {
-      return (
-        (!filters.isHighschool || scholarship.isHighschool === true) &&
-        (!filters.isCollege || scholarship.isCollege === true) &&
-        (!filters.isUnderserved || scholarship.isUnderserved === true) &&
-        (!filters.isInternational || scholarship.isInternational === true)
-      );
-    });
-
-    // Filter by due date if set.
-    if (filters.dueDate) {
-      const selectedDate = new Date(filters.dueDate);
-      filtered = filtered.filter((scholarship) => {
-        if (!scholarship.dueDate) return true;
-        const scholarshipDue = new Date(scholarship.dueDate);
-        // For example, show scholarships due on or after the selected date.
-        return scholarshipDue <= selectedDate;
-      });
+    if (isRenderingSpotlight || viewMode === "drafts" || viewMode === "saved") {
+      setViewMode("all");
     }
+    setIsRenderingSpotlight(false);
 
-    setFilteredScholarships(filtered);
+    if (
+      !filters.isCollege &&
+      !filters.isUnderserved &&
+      !filters.isHighschool &&
+      !filters.isInternational
+    ) {
+      setFilteredScholarships(allScholarships);
+    } else {
+      const filtered = allScholarships.filter((scholarship) => {
+        // Convert the entire scholarship object to a lower-case string
+        const scholarshipStr = JSON.stringify(scholarship).toLowerCase();
+
+        // Check the scholarship amount filter
+        const amount = scholarship.amount;
+        // if (amount > filters.amount) return false;
+
+        // For each boolean filter, if active, verify that the corresponding keyword exists in the scholarship object string
+        let filted = false;
+
+        if (
+          filters.isCollege &&
+          (/\b(?:college|university)\b/i.test(scholarshipStr) ||
+            scholarship.isCollege) &&
+          amount <= filters.amount
+        ) {
+          filted = true;
+        }
+
+        if (
+          filters.isHighschool &&
+          (/\b(?:high school|hs)\b/i.test(scholarshipStr) ||
+            scholarship.isHighschool) &&
+          amount <= filters.amount
+        ) {
+          filted = true;
+        }
+
+        if (
+          filters.isUnderserved &&
+          (/\b(?:underserved|daca|undocumented|minority|women|woman|indigenous|black|latina|latino|hbcu|disability)\b/i.test(
+            scholarshipStr
+          ) ||
+            scholarship.isUnderserved) &&
+          amount <= filters.amount
+        ) {
+          filted = true;
+        }
+
+        if (
+          filters.isInternational &&
+          (/\binternational\b/i.test(scholarshipStr) ||
+            scholarship.isInternational) &&
+          amount <= filters.amount
+        ) {
+          filted = true;
+        }
+
+        // Check due date filter if it's set
+        if (filters.dueDate) {
+          const selectedDate = new Date(filters.dueDate);
+          if (scholarship.dueDate) {
+            const scholarshipDue = new Date(scholarship.dueDate);
+            if (scholarshipDue > selectedDate) return false;
+          }
+        }
+
+        return filted;
+      });
+
+      setFilteredScholarships(filtered);
+    }
   };
 
+  // useEffect(() => {
+  //   if (viewMode !== "spotlight" && isControlFilterActive) {
+  //     condolr.log("xx", isControlFilterActive)
+  //     console.log("xyyzxyzy");
+  //     applyFilters();
+  //   }
+  // }, [filters, allScholarships]);
+
   useEffect(() => {
-    if (viewMode !== "spotlight") {
+    if (isControlFilterActive) {
       applyFilters();
     }
-  }, [filters, allScholarships]);
+  }, [filters, isControlFilterActive]);
 
   // alert(!(viewMode === "spotlight"));
   // alert(params.scholarshipID && viewMode !== "spotlight");
@@ -984,7 +1060,6 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
       </>
     );
   } else {
-    console.log("secret mode", secretMode);
     feedRender = (
       <>
         {params.scholarshipID && viewMode === "spotlight" ? (
@@ -1013,6 +1088,7 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
             >
               Spotlight
             </Heading>
+
             <ScholarshipList
               scholarships={filteredScholarships}
               onSaveScholarship={handleSaveScholarship}
@@ -1117,49 +1193,72 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
     }
   }, [isAiDrawerOpen]);
 
+  const clearFilters = () => {
+    const defaultFilters = {
+      amount: 5000,
+      isHighschool: false,
+      isCollege: false,
+      isUnderserved: false,
+      isInternational: false,
+      dueDate: "",
+    };
+
+    setFilters({ ...defaultFilters });
+  };
+
   useEffect(() => {
-    // window.alert(isRenderingSpotlight);
-    // Clear cached data and load the new collection when selectedCollection changes
-    if (!isRenderingSpotlight) {
+    let runSwitchCollection = async () => {
+      setSearchQuery("");
+      setLocalInput("");
+      setIsControlFilterActive(false);
+      clearFilters(); // Reset the filters visually
+
+      setIsFetchingUserData(true);
       setAllScholarships([]);
-      loadScholarships("all", true);
+      await loadScholarships("all", true);
+      setIsFetchingUserData(false);
+    };
+
+    if (!isRenderingSpotlight) {
+      runSwitchCollection();
     }
   }, [selectedCollection]);
 
   return (
-    <Container
-      width="100%"
-      position="relative"
-      style={{ paddingTop: 12, paddingInlineEnd: 0, paddingInlineStart: 0 }}
-    >
-      {/* <Banner /> */}
-      {/* <Button onClick={onUserProfileOpen}>User Profile</Button> */}
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          // justifyContent: "flex-end",
-
-          padding: 8,
-          paddingBottom: 0,
-          // position: "fixed",
-
-          width: "100%",
-          maxWidth: 606,
-
-          borderRadius: 4,
-          borderBottomRightRadius: 0,
-          borderBottomLeftRadius: 0,
-          top: 0,
-
-          position: "fixed",
-          background: "#faf2f4",
-          zIndex: 2,
-        }}
+    <>
+      <Container
+        width="100%"
+        position="relative"
+        style={{ paddingTop: 12, paddingInlineEnd: 0, paddingInlineStart: 0 }}
       >
-        <Box display="flex" alignItems={"center"} width="100%">
-          {/* <Link
+        {/* <Banner /> */}
+        {/* <Button onClick={onUserProfileOpen}>User Profile</Button> */}
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            // justifyContent: "flex-end",
+
+            padding: 8,
+            paddingBottom: 0,
+            // position: "fixed",
+
+            width: "100%",
+            maxWidth: 606,
+
+            borderRadius: 4,
+            borderBottomRightRadius: 0,
+            borderBottomLeftRadius: 0,
+            top: 0,
+
+            position: "fixed",
+            background: "#faf2f4",
+            zIndex: 2,
+          }}
+        >
+          <Box display="flex" alignItems={"center"} width="100%">
+            {/* <Link
           href="https://girlsoncampus.org"
           isExternal
           style={{ display: "flex", alignItems: "center" }}
@@ -1167,348 +1266,434 @@ Finally and most importantly: Aim for a tone that is honest, professional and fo
           <Image src={logo_transparent} height="18px" objectFit="cover" />
           &nbsp;Connect
         </Link> */}
-          <Box
-            width={50}
-            as="img"
-            src={logo_transparent}
-            borderRadius="34%"
-            style={{ cursor: "pointer" }}
-            onClick={() => {
-              setLocalInput("");
-              setSearchQuery("");
-              setViewMode("spotlight");
-              setIsRenderingSpotlight(true);
+            <Box
+              width={50}
+              as="img"
+              src={logo_transparent}
+              borderRadius="34%"
+              style={{ cursor: "pointer" }}
+              onClick={() => {
+                setLocalInput("");
+                setSearchQuery("");
+                setViewMode("spotlight");
+                setIsRenderingSpotlight(true);
 
-              navigate(`/`);
-            }}
-          />
-          &nbsp; &nbsp;
-          <Button
+                navigate(`/`);
+              }}
+            />
+            {/* <Button
             onClick={onUserProfileOpen}
             boxShadow="0.5px 0.5px 1px 0px black"
           >
             <VscAccount
               style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
-            />
-
+            /> */}
             {/* <SettingsIcon
             style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
           /> */}
             {/* &nbsp;&nbsp;Settings */}
-          </Button>
-          &nbsp;&nbsp;
-          <Button
-            onClick={onConnectDrawerOpen}
-            boxShadow="0.5px 0.5px 1px 0px black"
-          >
-            <IoAppsOutline
-              style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
-            />
-          </Button>
-          {/* &nbsp;&nbsp;
+            {/* </Button> */}
+            {/* &nbsp;&nbsp;  
           {secretMode ? (
   
           ) : null} */}
-          <Box flex="1" ml={4} width="100%">
-            <input
-              type="text"
-              placeholder={"Search anything"}
-              // value={searchQuery}
-              // onChange={(event) => debouncedOnChange(event.target.value)}
+            &nbsp;&nbsp;
+            <ScholarshipSearchModal didKey={didKey} />
+            <Box flex="1" ml={4} width="100%">
+              <input
+                type="text"
+                placeholder={"Search"}
+                // value={searchQuery}
+                // onChange={(event) => debouncedOnChange(event.target.value)}
 
-              value={localInput}
-              onChange={handleInputChange}
-              style={{
-                width: "100%",
-                padding: 8,
-                borderRadius: 6,
-                border: "1px solid #ccc",
-              }}
-              // disabled={!(viewMode === "spotlight" || viewMode === "all")}
-            />
-          </Box>
-          <Button
-            ml={2}
-            onClick={onFiltersOpen}
-            boxShadow="0.5px 0.5px 1px 0px black"
-          >
-            <TbFilterSearch
-              style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
-            />
-          </Button>
-        </Box>
-      </div>
-
-      <Box overflowX="auto" mt={16}>
-        <ResponsiveTabs
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          handleViewAllClick={handleViewAllClick}
-          handleViewDraftsClick={handleViewDraftsClick}
-          handleViewSavedClick={handleViewSavedClick}
-          handleMyScholarshipsClick={handleMyScholarshipsClick}
-          handleRecommendedClick={handleRecommendedClick}
-          loadScholarships={loadScholarships}
-          setSelectedCollection={setSelectedCollection}
-          selectedCollection={selectedCollection}
-          setIsRenderingSpotlight={setIsRenderingSpotlight}
-        >
-          {feedRender}
-        </ResponsiveTabs>
-        {viewMode === "spotlight" ? <div>{feedRender}</div> : null}
-      </Box>
-      {isUserProfileOpen ? (
-        <EditProfileModal
-          fetchUserDataNoLoading={fetchUserDataNoLoading}
-          isOpen={isUserProfileOpen}
-          onClose={onUserProfileClose}
-          setDidKey={setDidKey}
-          didKey={didKey}
-          initialName={name}
-          initialEmail={email}
-          initialDescription={description}
-          handleSaveSettings={handleSaveSettings}
-          handleSubmitFilters={filterScholarships}
-        />
-      ) : null}
-
-      {isAiDrawerOpen ? (
-        <AiDrawer
-          abortPrompt={abortPrompt}
-          setExistingDraft={setExistingDraft}
-          existingDraft={existingDraft}
-          isOpen={isAiDrawerOpen}
-          onClose={onAiDrawerClose}
-          messages={messages}
-          handleFormSubmit={handleFormSubmit}
-          resetMessages={resetMessages}
-          onSaveDraft={handleSaveDraft}
-          isSending={isSending}
-          original={originalDraft}
-          onSend={onSend}
-          selectedScholarship={selectedScholarship}
-          // fireScholarshipResponse={fireScholarshipResponse}
-          // setFireScholarshipResponse={setFireScholarshipResponse}
-        />
-      ) : null}
-
-      {isInstallModalOpen ? (
-        <InstallAppModal
-          isOpen={isInstallModalOpen}
-          onClose={onInstallModalClose}
-        />
-      ) : null}
-
-      <Drawer
-        isOpen={isFiltersOpen}
-        placement="right"
-        onClose={onFiltersClose}
-        blockScrollOnMount={false}
-      >
-        <DrawerOverlay />
-        <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader display="flex" alignItems={"center"}>
-            {" "}
-            <TbFilterSearch />
-            &nbsp; More Filter Controls
-          </DrawerHeader>
-
-          <DrawerBody>
-            {/* Scholarship Amount Filter */}
-
-            {/* Due Date Filter */}
-            <FormControl mb={6}>
-              <FormLabel>Due Date</FormLabel>
-              <ChakraInput
-                type="date"
-                value={filters.dueDate}
-                onChange={(e) => {
-                  setFilters((prev) => ({ ...prev, dueDate: e.target.value }));
-                  setIsControlFilterActive(true);
+                value={localInput}
+                onChange={handleInputChange}
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  borderRadius: 6,
+                  border: "1px solid #ccc",
                 }}
+                // disabled={!(viewMode === "spotlight" || viewMode === "all")}
               />
-            </FormControl>
-            <FormControl mb={6}>
-              <FormLabel>Scholarship Amount (Maximum)</FormLabel>
-              <HStack spacing={4}>
-                <Box flex="1">
-                  <Slider
-                    colorScheme="pink"
-                    min={0}
-                    max={50000}
-                    step={500}
-                    value={filters.amount}
-                    onChange={(val) => {
-                      setFilters((prev) => ({ ...prev, amount: val }));
-                      setIsControlFilterActive(true);
-                    }}
-                  >
-                    <SliderTrack>
-                      <SliderFilledTrack />
-                    </SliderTrack>
-                    <SliderThumb />
-                  </Slider>
-                </Box>
-                {/* <Box width="100px">
+            </Box>
+            <Button
+              ml={2}
+              onClick={onFiltersOpen}
+              boxShadow="0.5px 0.5px 1px 0px black"
+            >
+              <TbFilterSearch
+                style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
+              />
+            </Button>
+            &nbsp;&nbsp;
+            <Button
+              onClick={onConnectDrawerOpen}
+              boxShadow="0.5px 0.5px 1px 0px black"
+            >
+              <IoAppsOutline
+                style={{ color: "#C95F8F", textShadow: "3px 3px 3px black" }}
+              />
+            </Button>
+          </Box>
+        </div>
+
+        <Box overflowX="auto" mt={16}>
+          <ResponsiveTabs
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            handleViewAllClick={handleViewAllClick}
+            handleViewDraftsClick={handleViewDraftsClick}
+            handleViewSavedClick={handleViewSavedClick}
+            handleMyScholarshipsClick={handleMyScholarshipsClick}
+            handleRecommendedClick={handleRecommendedClick}
+            loadScholarships={loadScholarships}
+            setSelectedCollection={setSelectedCollection}
+            selectedCollection={selectedCollection}
+            setIsRenderingSpotlight={setIsRenderingSpotlight}
+          >
+            {feedRender}
+          </ResponsiveTabs>
+          {viewMode === "spotlight" ? <Box>{feedRender}</Box> : null}
+        </Box>
+        {isUserProfileOpen ? (
+          <EditProfileModal
+            fetchUserDataNoLoading={fetchUserDataNoLoading}
+            isOpen={isUserProfileOpen}
+            onClose={onUserProfileClose}
+            setDidKey={setDidKey}
+            didKey={didKey}
+            initialName={name}
+            initialEmail={email}
+            initialDescription={description}
+            handleSaveSettings={handleSaveSettings}
+            handleSubmitFilters={filterScholarships}
+          />
+        ) : null}
+
+        {isAiDrawerOpen ? (
+          <AiDrawer
+            abortPrompt={abortPrompt}
+            setExistingDraft={setExistingDraft}
+            existingDraft={existingDraft}
+            isOpen={isAiDrawerOpen}
+            onClose={onAiDrawerClose}
+            messages={messages}
+            handleFormSubmit={handleFormSubmit}
+            resetMessages={resetMessages}
+            onSaveDraft={handleSaveDraft}
+            isSending={isSending}
+            original={originalDraft}
+            onSend={onSend}
+            selectedScholarship={selectedScholarship}
+            // fireScholarshipResponse={fireScholarshipResponse}
+            // setFireScholarshipResponse={setFireScholarshipResponse}
+          />
+        ) : null}
+
+        {isInstallModalOpen ? (
+          <InstallAppModal
+            isOpen={isInstallModalOpen}
+            onClose={onInstallModalClose}
+          />
+        ) : null}
+
+        {isLoanInfoModalOpen ? (
+          <LoanInfoModal
+            isOpen={isLoanInfoModalOpen}
+            onClose={onLoanInfoClose}
+          />
+        ) : null}
+
+        <Drawer
+          isOpen={isFiltersOpen}
+          placement="right"
+          onClose={onFiltersClose}
+          blockScrollOnMount={false}
+        >
+          <DrawerOverlay />
+          <DrawerContent>
+            <DrawerCloseButton />
+            <DrawerHeader display="flex" alignItems={"center"}>
+              {" "}
+              <TbFilterSearch />
+              &nbsp; More Filter Controls
+            </DrawerHeader>
+
+            <DrawerBody>
+              {/* Scholarship Amount Filter */}
+
+              {/* Due Date Filter */}
+              {selectedCollection === "careers" ? null : (
+                <FormControl mb={6}>
+                  <FormLabel>Due Dates Up To</FormLabel>
                   <ChakraInput
-                    type="number"
-                    value={filters.amount}
-                    onChange={(e) =>
+                    type="date"
+                    value={filters.dueDate}
+                    onChange={(e) => {
                       setFilters((prev) => ({
                         ...prev,
-                        amount: Number(e.target.value),
-                      }))
-                    }
+                        dueDate: e.target.value,
+                      }));
+                      setIsControlFilterActive(true);
+                    }}
                   />
-                </Box> */}
-              </HStack>
-              <Box mt={2} fontSize="sm" color="gray.600">
-                Selected Maximum Amount: ${filters.amount}
-              </Box>
-            </FormControl>
-
-            {/* Boolean Filters */}
-            <FormControl mb={6}>
-              <FormLabel>Scholarship Categories</FormLabel>
-              <Stack spacing={2}>
-                <Checkbox
-                  colorScheme="pink"
-                  isChecked={filters.isHighschool}
-                  onChange={(e) => {
+                </FormControl>
+              )}
+              {selectedCollection === "careers" ? null : (
+                <FormControl mb={6}>
+                  <FormLabel>Scholarship Amount (Maximum)</FormLabel>
+                  <HStack spacing={4}>
+                    <Box flex="1">
+                      <Slider
+                        colorScheme="pink"
+                        min={0}
+                        max={50000}
+                        step={500}
+                        value={filters.amount}
+                        onChange={(val) => {
+                          setFilters((prev) => ({ ...prev, amount: val }));
+                          setIsControlFilterActive(true);
+                        }}
+                      >
+                        <SliderTrack>
+                          <SliderFilledTrack />
+                        </SliderTrack>
+                        <SliderThumb />
+                      </Slider>
+                    </Box>
+                    {/* <Box width="100px">
+                <ChakraInput
+                  type="number"
+                  value={filters.amount}
+                  onChange={(e) =>
                     setFilters((prev) => ({
                       ...prev,
-                      isHighschool: e.target.checked,
-                    }));
-                    setIsControlFilterActive(true);
-                  }}
-                >
-                  High School
-                </Checkbox>
-                <Checkbox
-                  colorScheme="pink"
-                  isChecked={filters.isCollege}
-                  onChange={(e) => {
-                    setFilters((prev) => ({
-                      ...prev,
-                      isCollege: e.target.checked,
-                    }));
-                    setIsControlFilterActive(true);
-                  }}
-                >
-                  College
-                </Checkbox>
-                <Checkbox
-                  colorScheme="pink"
-                  isChecked={filters.isUnderserved}
-                  onChange={(e) => {
-                    setFilters((prev) => ({
-                      ...prev,
-                      isUnderserved: e.target.checked,
-                    }));
-                    setIsControlFilterActive(true);
-                  }}
-                >
-                  Underserved
-                </Checkbox>
-                <Checkbox
-                  colorScheme="pink"
-                  isChecked={filters.isInternational}
-                  onChange={(e) => {
-                    setFilters((prev) => ({
-                      ...prev,
-                      isInternational: e.target.checked,
-                    }));
-                    setIsControlFilterActive(true);
-                  }}
-                >
-                  International
-                </Checkbox>
-              </Stack>
-            </FormControl>
-          </DrawerBody>
-          <DrawerFooter>
-            <Button variant="outline" mr={3} onClick={onFiltersClose}>
-              Close
-            </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+                      amount: Number(e.target.value),
+                    }))
+                  }
+                />
+              </Box> */}
+                  </HStack>
+                  <Box mt={2} fontSize="sm" color="gray.600">
+                    Selected Maximum Amount: ${filters.amount}
+                  </Box>
+                </FormControl>
+              )}
 
-      <Drawer
-        isOpen={isConnectDrawerOpen}
-        placement="right"
-        onClose={onConnectDrawerClose}
-        blockScrollOnMount={false}
-      >
-        {/* <DrawerOverlay /> */}
-        <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader display="flex" alignItems={"center"}>
-            {" "}
-            <IoAppsOutline />
-            &nbsp; Navigate
-          </DrawerHeader>
+              {/* Boolean Filters */}
+              <FormControl mb={6}>
+                <FormLabel>Scholarship Categories</FormLabel>
+                <Stack spacing={2}>
+                  <Checkbox
+                    colorScheme="pink"
+                    isChecked={filters.isHighschool}
+                    onChange={(e) => {
+                      setIsControlFilterActive(true);
 
-          <DrawerBody>
-            <VStack spacing={4}>
-              {/* Example Connect Link Buttons */}
-              <Link
-                href="https://girlsoncampus.org"
-                isExternal
-                style={{ display: "flex", alignItems: "center" }}
-              >
-                <Image src={logo_transparent} height="18px" objectFit="cover" />
-                &nbsp;Connect
-              </Link>
-
-              <Link onClick={onInstallModalOpen}>Install App</Link>
-
-              {secretMode ? (
-                <>
-                  <br />
-                  <h4>Your Eyes Only</h4>
-
-                  <Link onClick={() => navigate("/")}>User Mode</Link>
-                  <Link onClick={() => navigate("/edit")}>Edit Mode</Link>
-
-                  <Link onClick={() => navigate("/admin")}>Admin Mode</Link>
-
-                  <Button
-                    onClick={onWalletOpen}
-                    boxShadow="0.5px 0.5px 1px 0px black"
+                      setFilters((prev) => ({
+                        ...prev,
+                        isHighschool: e.target.checked,
+                      }));
+                    }}
                   >
-                    <SiCashapp
-                      style={{
-                        color: "#C95F8F",
-                        textShadow: "3px 3px 3px black",
-                      }}
-                    />{" "}
-                    &nbsp; Wallet
-                  </Button>
-                </>
-              ) : null}
-              {/* <Button onClick={() => console.log("Link 2 Selected")}>
+                    High School
+                  </Checkbox>
+                  <Checkbox
+                    colorScheme="pink"
+                    isChecked={filters.isCollege}
+                    onChange={(e) => {
+                      setIsControlFilterActive(true);
+                      setFilters((prev) => ({
+                        ...prev,
+                        isCollege: e.target.checked,
+                      }));
+                    }}
+                  >
+                    College
+                  </Checkbox>
+                  <Checkbox
+                    colorScheme="pink"
+                    isChecked={filters.isUnderserved}
+                    onChange={(e) => {
+                      setIsControlFilterActive(true);
+                      setFilters((prev) => ({
+                        ...prev,
+                        isUnderserved: e.target.checked,
+                      }));
+                    }}
+                  >
+                    Underserved
+                  </Checkbox>
+                  <Checkbox
+                    colorScheme="pink"
+                    isChecked={filters.isInternational}
+                    onChange={(e) => {
+                      setIsControlFilterActive(true);
+                      setFilters((prev) => ({
+                        ...prev,
+                        isInternational: e.target.checked,
+                      }));
+                    }}
+                  >
+                    International
+                  </Checkbox>
+                </Stack>
+              </FormControl>
+            </DrawerBody>
+            <DrawerFooter>
+              <Button variant="outline" mr={3} onClick={onFiltersClose}>
+                Close
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+
+        <Drawer
+          isOpen={isConnectDrawerOpen}
+          placement="right"
+          onClose={onConnectDrawerClose}
+          blockScrollOnMount={false}
+        >
+          {/* <DrawerOverlay /> */}
+          <DrawerContent>
+            <DrawerCloseButton />
+            <DrawerHeader display="flex" alignItems={"center"}>
+              {" "}
+              <IoAppsOutline />
+              &nbsp; Navigate
+            </DrawerHeader>
+
+            <DrawerBody>
+              <VStack spacing={4}>
+                {/* Example Connect Link Buttons */}
+
+                <Link
+                  div="button"
+                  onClick={onUserProfileOpen}
+                  display="flex"
+                  alignItems={"center"}
+                  width="100%"
+                >
+                  <VscAccount
+                    style={{
+                      color: "#C95F8F",
+                      textShadow: "3px 3px 3px black",
+                    }}
+                  />{" "}
+                  <div style={{ width: "100%", marginLeft: "7px" }}>
+                    Profile
+                  </div>
+                </Link>
+
+                <Link
+                  href="https://www.girlsoncampus.org"
+                  isExternal
+                  style={{ display: "flex", alignItems: "center" }}
+                  width="100%"
+                  marginLeft="-4px"
+                >
+                  <Image
+                    src={logo_transparent}
+                    height="18px"
+                    objectFit="cover"
+                  />
+                  <div style={{ width: "100%", marginLeft: "4px" }}>
+                    Connect
+                  </div>
+                </Link>
+
+                <Link
+                  onClick={onLoanInfoOpen}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                  width="100%"
+                >
+                  <div style={{ marginLeft: "0px" }}>
+                    <FaInfoCircle color="#C95F8F" />
+                  </div>
+                  <div style={{ width: "100%", marginLeft: "5px" }}>
+                    Student Loan Resources
+                  </div>
+                </Link>
+
+                <Link
+                  onClick={onInstallModalOpen}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                  width="100%"
+                >
+                  <div style={{ marginLeft: "0.5px" }}>
+                    <LuDownload color="#C95F8F" />
+                  </div>
+                  <div style={{ width: "100%", marginLeft: "7px" }}>
+                    Install App
+                  </div>
+                </Link>
+
+                {/* <Button onClick={() => console.log("Link 2 Selected")}>
                 Connect Link 2
               </Button>
               <Button onClick={() => console.log("Link 3 Selected")}>
                 Connect Link 3
               </Button> */}
-            </VStack>
-          </DrawerBody>
+              </VStack>
+              <br />
+              <VStack>
+                {secretMode ? (
+                  <>
+                    <br />
+                    <h4 style={{ width: "100%" }}>Admin stuff</h4>
 
-          <DrawerFooter>
-            <Button variant="outline" mr={3} onClick={onConnectDrawerClose}>
-              Close
-            </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+                    <Link width="100%" onClick={() => navigate("/")} mb={3}>
+                      View As User
+                    </Link>
+                    <Link width="100%" onClick={() => navigate("/edit")} mb={3}>
+                      Edit
+                    </Link>
 
-      {isWalletOpen ? (
-        <WalletModal isOpen={isWalletOpen} onClose={onWalletClose} />
-      ) : null}
-    </Container>
+                    <Link
+                      width="100%"
+                      onClick={() => navigate("/admin")}
+                      mb={3}
+                    >
+                      Upload Content
+                    </Link>
+
+                    <Button
+                      onClick={onWalletOpen}
+                      boxShadow="0.5px 0.5px 1px 0px black"
+                    >
+                      <SiCashapp
+                        style={{
+                          color: "#C95F8F",
+                          textShadow: "3px 3px 3px black",
+                        }}
+                      />{" "}
+                      &nbsp; Wallet
+                    </Button>
+                  </>
+                ) : null}
+              </VStack>
+            </DrawerBody>
+
+            <DrawerFooter>
+              <Button variant="outline" mr={3} onClick={onConnectDrawerClose}>
+                Close
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+
+        {isWalletOpen ? (
+          <WalletModal isOpen={isWalletOpen} onClose={onWalletClose} />
+        ) : null}
+      </Container>
+    </>
   );
 };
 

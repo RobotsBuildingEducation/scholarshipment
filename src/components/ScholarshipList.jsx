@@ -26,6 +26,7 @@ const ScholarshipList = ({
   const handleLoadMore = () => {
     setVisibleCount((prev) => prev + 10);
   };
+
   return (
     <VStack spacing={4} mt={12}>
       {visibleScholarships.map((scholarship, index) => (

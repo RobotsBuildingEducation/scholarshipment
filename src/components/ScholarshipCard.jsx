@@ -212,7 +212,8 @@ const ScholarshipCard = ({
       </div>
 
       <Box p={6} style={{ marginTop: "-4px" }}>
-        {scholarship?.collectionType === "careers" ? null : (
+        {scholarship?.collectionType === "careers" ||
+        !scholarship.dueDate ? null : (
           <Text>
             <b>Due Date</b> <br />
             {scholarship?.dueDate.toLowerCase().includes("error")

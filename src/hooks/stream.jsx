@@ -3,69 +3,76 @@ import React, { useState } from "react";
 import { ReadableStream } from "web-streams-polyfill";
 import { appCheck } from "../database/setup";
 
-// Converts the OpenAI API params + chat messages list + an optional AbortSignal into a shape that
-// the fetch interface expects.
+// Modified request options builder to support both endpoints.
 export const getOpenAiRequestOptions = (
-  { apiKey, model, ...restOfApiParams },
+  { apiKey, model, useWebSearch, ...restOfApiParams },
   messages,
   signal
-) => ({
-  headers: {
-    "Content-Type": "application/json",
-    // "X-Firebase-AppCheck": appCheckToken.token,
-    // Authorization: `Bearer ${apiKey}`,
-  },
-  method: "POST",
-  body: JSON.stringify({
-    model,
-    // Includes all settings related to how the user wants the OpenAI API to execute their request.
-    ...restOfApiParams,
-    messages,
-    stream: false, // Disable streaming
-  }),
-  signal,
-});
+) => {
+  if (useWebSearch) {
+    // For web search, concatenate all message contents into a single input string.
+    const input = messages.map((m) => m.content).join("\n");
+    return {
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      body: JSON.stringify({
+        model,
+        ...restOfApiParams,
+        input,
+        stream: false, // Disable streaming
+      }),
+      signal,
+    };
+  } else {
+    // Default: use messages array for chat completions.
+    return {
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      body: JSON.stringify({
+        model,
+        ...restOfApiParams,
+        messages,
+        stream: false, // Disable streaming
+      }),
+      signal,
+    };
+  }
+};
 
-// const CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+// Endpoints for chat completions and web search.
 const CHAT_COMPLETIONS_URL =
   "https://us-central1-scholarshipment.cloudfunctions.net/app/generate";
+const WEBSEARCH_COMPLETIONS_URL =
+  "https://us-central1-scholarshipment.cloudfunctions.net/app/websearch";
 
-/**
-   *       const updatedChunks = [
-          ...msg.meta.chunks,
-          {
-            content: chunkContent,
-            role: chunkRole,
-            timestamp: Date.now(),
-            final: isFinal,
-          },
-        ];
-   */
-const textDecoder = new TextDecoder("utf-8");
-// Takes a set of fetch request options and calls the onIncomingChunk and onCloseStream functions
-// as chunks of a chat completion's data are returned to the client, in real-time.
-export const openAiCompletionHandler = async (requestOpts) => {
+// Fetch handler that chooses the proper URL based on the useWebSearch flag.
+export const openAiCompletionHandler = async (
+  requestOpts,
+  useWebSearch = false
+) => {
   const appCheckTokenResult = await getToken(appCheck);
   const appCheckToken = appCheckTokenResult.token;
   requestOpts["headers"]["X-Firebase-AppCheck"] = appCheckToken;
 
-  const response = await fetch(CHAT_COMPLETIONS_URL, requestOpts);
+  const url = useWebSearch ? WEBSEARCH_COMPLETIONS_URL : CHAT_COMPLETIONS_URL;
+  const response = await fetch(url, requestOpts);
   if (!response.ok) {
     throw new Error(
       `Network response was not ok: ${response.status} - ${response.statusText}`
     );
   }
-
-  const result = await response.json(); // Await the entire response as JSON
-  return result; // Return the full JSON response
+  const result = await response.json(); // Await the full JSON response
+  return result;
 };
 
 const MILLISECONDS_PER_SECOND = 1000;
-// Utility method for transforming a chat message decorated with metadata to a more limited shape
-// that the OpenAI API expects.
+// Utility method for transforming a chat message to the minimal shape.
 const officialOpenAIParams = ({ content, role }) => ({ content, role });
-// Utility method for transforming a chat message that may or may not be decorated with metadata
-// to a fully-fledged chat message with metadata.
+// Utility method for creating a chat message with metadata.
 const createChatMessage = ({ content, role, ...restOfParams }) => ({
   content,
   role,
@@ -85,30 +92,36 @@ export const updateLastItem = (msgFn) => (currentMessages) =>
     }
     return msg;
   });
+
 export const useChatCompletion = (apiParams) => {
+  const [fullResponse, _setFullResponse] = useState({});
   const [messages, _setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [controller, setController] = useState(null);
-  // Abort an in-progress streaming response
+
+  // Abort an in-progress request.
   const abortResponse = () => {
     if (controller) {
       controller.abort();
       setController(null);
     }
   };
-  // Reset the messages list as long as a response isn't being loaded.
+
+  // Reset the messages if not loading.
   const resetMessages = () => {
     if (!loading) {
       _setMessages([]);
     }
   };
-  // Overwrites all existing messages with the list of messages passed to it.
+
+  // Overwrite messages with new ones.
   const setMessages = (newMessages) => {
     if (!loading) {
       _setMessages(newMessages.map(createChatMessage));
     }
   };
-  // When new data comes in, add the incremental chunk of data to the last message.
+
+  // Append new incremental data to the last message.
   const handleNewData = async (content, role, isFinal = false) => {
     _setMessages(
       updateLastItem((msg) => {
@@ -135,15 +148,12 @@ export const useChatCompletion = (apiParams) => {
     );
   };
 
-  // Handles what happens when the stream of a given completion is finished.
+  // Called when the response stream is finished.
   const closeStream = (beforeTimestamp) => {
-    // Determine the final timestamp, and calculate the number of seconds the full request took.
     const afterTimestamp = Date.now();
     const diffInSeconds =
       (afterTimestamp - beforeTimestamp) / MILLISECONDS_PER_SECOND;
     const formattedDiff = diffInSeconds.toFixed(2) + " sec.";
-    // Update the messages list, specifically update the last message entry with the final
-    // details of the full request/response.
     _setMessages(
       updateLastItem((msg) => ({
         ...msg,
@@ -157,18 +167,16 @@ export const useChatCompletion = (apiParams) => {
       }))
     );
   };
+
+  // Main submission function.
   const submitPrompt = React.useCallback(
     async (newMessages) => {
-      // Don't let two calls happen at the same time
+      // Prevent concurrent requests.
       if (messages[messages.length - 1]?.meta?.loading) return;
-
-      // Don't make a request if no new messages
-      if (!newMessages || newMessages.length < 1) {
-        return;
-      }
+      if (!newMessages || newMessages.length < 1) return;
       setLoading(true);
 
-      // Update the messages with a placeholder for the response
+      // Add new messages and a placeholder for the response.
       const updatedMessages = [
         ...messages,
         ...newMessages.map(createChatMessage),
@@ -182,47 +190,86 @@ export const useChatCompletion = (apiParams) => {
 
       _setMessages(updatedMessages);
 
-      // Create a controller for aborting the request
+      // Create an abort controller.
       const newController = new AbortController();
       const signal = newController.signal;
       setController(newController);
 
-      // Define request options
+      // Build the request options.
+      // For web search, we convert messages differently (via getOpenAiRequestOptions).
       const requestOpts = getOpenAiRequestOptions(
         apiParams,
         updatedMessages
-          .filter((m, i) => updatedMessages.length - 1 !== i) // Remove placeholder
-          .map(officialOpenAIParams),
+          .filter((m, i) => updatedMessages.length - 1 !== i)
+          .map((msg) =>
+            apiParams.useWebSearch ? msg : officialOpenAIParams(msg)
+          ),
         signal
       );
 
       try {
-        // Fetch the full completion response
-        const openaiResponse = await openAiCompletionHandler(requestOpts);
-
-        // Handle the final response (assumes the final result is in openaiResponse)
-        handleNewData(
-          openaiResponse.choices[0].message.content,
-          openaiResponse.choices[0].message.role,
-          true
+        const openaiResponse = await openAiCompletionHandler(
+          requestOpts,
+          !!apiParams.useWebSearch
         );
 
-        // Finalize stream (closeStream is optional now since it's not streaming)
+        // Debug logs for troubleshooting
+        console.log("Response:", openaiResponse);
+        _setFullResponse(openaiResponse);
+
+        let finalContent = "";
+        let finalRole = "assistant";
+
+        if (openaiResponse.choices && openaiResponse.choices[0]) {
+          // Existing chat completions structure.
+          finalContent = openaiResponse.choices[0].message.content;
+          finalRole = openaiResponse.choices[0].message.role;
+        } else if (openaiResponse.output && openaiResponse.output.length > 0) {
+          // New Responses API structure.
+          // Find the first message-type output.
+          const messageObj = openaiResponse.output.find(
+            (item) => item.type === "message"
+          );
+          if (
+            messageObj &&
+            messageObj.content &&
+            messageObj.content.length > 0
+          ) {
+            const outputTextObj = messageObj.content.find(
+              (contentItem) => contentItem.type === "output_text"
+            );
+            if (outputTextObj && outputTextObj.text) {
+              finalContent = outputTextObj.text;
+              finalRole = messageObj.role || "assistant";
+            } else {
+              throw new Error("No output text found in response");
+            }
+          } else {
+            throw new Error("No message found in response output");
+          }
+        } else {
+          throw new Error("Unexpected response structure");
+        }
+
+        // Handle the final response.
+        handleNewData(finalContent, finalRole, true);
         closeStream(Date.now());
       } catch (err) {
         if (signal.aborted) {
-          console.error(`Request aborted`, err);
+          console.error("Request aborted", err);
         } else {
-          console.error(`Error during chat completion`, err);
+          console.error("Error during chat completion", err);
         }
       } finally {
         setController(null);
         setLoading(false);
       }
     },
-    [messages]
+    [messages, apiParams]
   );
 
+  console.log("msgxx", messages);
+  console.log("fullresponsex", fullResponse);
   return {
     messages,
     loading,
@@ -230,5 +277,6 @@ export const useChatCompletion = (apiParams) => {
     abortResponse,
     resetMessages,
     setMessages,
+    fullResponse,
   };
 };

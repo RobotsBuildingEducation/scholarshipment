@@ -19,19 +19,19 @@ export default defineConfig({
         description: "PWA install  handler package for Girls On Campus",
         icons: [
           {
-            src: "https://res.cloudinary.com/dtkeyccga/image/upload/v1737987478/mtjoaqnpf2pxa7xi4urm.png",
+            src: "https://res.cloudinary.com/dtkeyccga/image/upload/v1737988159/Untitled_design_59_u8rhji.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "https://res.cloudinary.com/dtkeyccga/image/upload/v1737987478/mtjoaqnpf2pxa7xi4urm.png",
+            src: "https://res.cloudinary.com/dtkeyccga/image/upload/v1737988159/Untitled_design_59_u8rhji.png",
             sizes: "256x256",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "https://res.cloudinary.com/dtkeyccga/image/upload/v1737987469/pdncr1eoxppqgp0uhvwk.png",
+            src: "https://res.cloudinary.com/dtkeyccga/image/upload/v1737988159/Untitled_design_59_u8rhji.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any",
