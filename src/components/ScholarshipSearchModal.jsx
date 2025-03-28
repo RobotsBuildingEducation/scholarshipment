@@ -19,8 +19,12 @@ import {
   Checkbox,
   FormControl,
   FormLabel,
+  UnorderedList,
+  ListItem,
+  Heading,
 } from "@chakra-ui/react";
 import { useDisclosure } from "@chakra-ui/react";
+import ChakraUIRenderer from "chakra-ui-markdown-renderer";
 import { useWebSearchAgent } from "../hooks/useChatCompletion";
 import Markdown from "react-markdown";
 import { MdSupportAgent } from "react-icons/md";
@@ -29,6 +33,16 @@ import { database } from "../database/setup";
 
 // Helper: Parse suggestions and group annotations.
 // This function assumes your suggestions are numbered (e.g., "1. ", "2. ", etc.)
+
+const newTheme = {
+  p: (props) => <Text fontSize="sm" mb={2} lineHeight="1.6" {...props} />,
+  ul: (props) => <UnorderedList pl={6} spacing={2} {...props} />,
+  ol: (props) => <UnorderedList as="ol" pl={6} spacing={2} {...props} />,
+  li: (props) => <ListItem mb={1} {...props} />,
+  h1: (props) => <Heading as="h4" mt={6} size="md" {...props} />,
+  h2: (props) => <Heading as="h4" mt={6} size="md" {...props} />,
+  h3: (props) => <Heading as="h4" mt={6} size="md" {...props} />,
+};
 
 export const ScholarshipSearchModal = ({ didKey }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -137,30 +151,31 @@ export const ScholarshipSearchModal = ({ didKey }) => {
                   >
                     <Markdown
                       children={outputTextItem.text}
-                      components={{
-                        a: ({ node, ...props }) => (
-                          <Link
-                            {...props}
-                            color="blue.600"
-                            fontWeight="bold"
-                            textDecoration="underline"
-                            isExternal
-                          >
-                            {props.children}
-                          </Link>
-                        ),
-                        ol: ({ node, children, ...props }) => (
-                          <ol {...props}>
-                            {React.Children.map(children, (child) =>
-                              React.isValidElement(child)
-                                ? React.cloneElement(child, {
-                                    style: { marginBottom: "24px" },
-                                  })
-                                : child
-                            )}
-                          </ol>
-                        ),
-                      }}
+                      // components={{
+                      //   a: ({ node, ...props }) => (
+                      //     <Link
+                      //       {...props}
+                      //       color="blue.600"
+                      //       fontWeight="bold"
+                      //       textDecoration="underline"
+                      //       isExternal
+                      //     >
+                      //       {props.children}
+                      //     </Link>
+                      //   ),
+                      //   ol: ({ node, children, ...props }) => (
+                      //     <ol {...props}>
+                      //       {React.Children.map(children, (child) =>
+                      //         React.isValidElement(child)
+                      //           ? React.cloneElement(child, {
+                      //               style: { marginBottom: "24px" },
+                      //             })
+                      //           : child
+                      //       )}
+                      //     </ol>
+                      //   ),
+                      // }}
+                      components={ChakraUIRenderer(newTheme)}
                     />
                   </Box>
                 );
